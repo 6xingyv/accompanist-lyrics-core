@@ -1,7 +1,6 @@
 package io.mocha.music.lyrics.parser
 
 import io.mocha.music.lyrics.model.SyncedLyrics
-import io.mocha.music.lyrics.model.synced.SyncedLine
 import io.mocha.music.lyrics.model.synced.UncheckedSyncedLine
 import io.mocha.music.lyrics.utils.parseAsTime
 
