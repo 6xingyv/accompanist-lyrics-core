@@ -10,6 +10,7 @@ data class KaraokeLine(
     override val start: Int,
     override val end: Int,
 ) : ISyncedLine {
+
     init {
         require(end >= start)
     }
