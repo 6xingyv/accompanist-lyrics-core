@@ -4,6 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import io.mocha.music.lyrics.model.karaoke.KaraokeAlignment
+import io.mocha.music.lyrics.model.karaoke.KaraokeLine
 
 class TTMLParserTest {
     @Test
@@ -11,8 +12,8 @@ class TTMLParserTest {
         val ttml = """
             <tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata">
                 <head><metadata xmlns="">
-                    <ttm:agent type="person" xml:id="v1"/>
-                    <ttm:agent type="other" xml:id="v2"/>
+                    <ttm:agent type="singer" xml:id="v1"/>
+                    <ttm:agent type="person" xml:id="v2"/>
                 </metadata></head>
                 <body>
                     <div xmlns="">
@@ -39,17 +40,20 @@ class TTMLParserTest {
         val result = parser.parse(listOf(ttml))
 
         // 验证解析出的行数
-        assertEquals(2, result.lines.size)
+        assertEquals(3, result.lines.size)
 
-        // 验证第一行的对齐方式(v1 = person)
-        assertEquals(KaraokeAlignment.Start, result.lines[0].alignment)
+        // 验证第一行的对齐方式(第一个agent v1)应该是左对齐
+        assertEquals(KaraokeAlignment.Start, (result.lines[0] as KaraokeLine).alignment)
 
-        // 验证第二行的对齐方式(v2 = other)
-        assertEquals(KaraokeAlignment.End, result.lines[1].alignment)
+        // 验证第二行的对齐方式(第二个agent v2)应该是右对齐
+        assertEquals(KaraokeAlignment.End, (result.lines[1] as KaraokeLine).alignment)
 
+        // 验证背景音节的对齐方式应该继承自父元素的agent(v2 右对齐)
+        assertEquals(KaraokeAlignment.End, (result.lines[2] as KaraokeLine).alignment)
+        
         // 验证背景音节被正确解析
-        val secondLine = result.lines[1]
-        assertEquals(4, secondLine.syllables.size) // "I", "never", "wanna", "see"
-        assertEquals("I never wanna see", secondLine.syllables.joinToString(" ") { it.content.trim() })
+        val bgLine = result.lines[2] as KaraokeLine
+        assertEquals(2, bgLine.syllables.size) // "wanna", "see"
+        assertEquals("wanna see", bgLine.syllables.joinToString(" ") { it.content.trim() })
     }
 }

@@ -22,20 +22,15 @@ class TTMLParser : ILyricsParser {
     private fun parseMetadata(element: XmlElement): TTMLMetadata {
         val metadata = element.children.find { it.name == "metadata" } ?: return TTMLMetadata()
 
-        val agents = metadata.children
-            .filter { it.name == "ttm:agent" }
-            .associate { agent ->
-                val id = agent.attributes.find { it.name == "xml:id" }?.value ?: ""
-                val type = agent.attributes.find { it.name == "type" }?.value ?: ""
-                id to AgentInfo(
-                    type = type,
-                    alignment = when (type) {
-                        "person" -> KaraokeAlignment.Start
-                        "other" -> KaraokeAlignment.End
-                        else -> KaraokeAlignment.Unspecified
-                    }
-                )
-            }
+        val agentElements = metadata.children.filter { it.name == "ttm:agent" }
+        val agents = agentElements.mapIndexed { index, agent ->
+            val id = agent.attributes.find { it.name == "xml:id" }?.value ?: ""
+            val type = agent.attributes.find { it.name == "type" }?.value ?: ""
+            id to AgentInfo(
+                type = type,
+                alignment = if (index == 0) KaraokeAlignment.Start else KaraokeAlignment.End
+            )
+        }.toMap()
 
         return TTMLMetadata(agents)
     }
@@ -45,7 +40,7 @@ class TTMLParser : ILyricsParser {
         metadata: TTMLMetadata
     ): KaraokeAlignment {
         val agentId = element.attributes.find { it.name == "ttm:agent" }?.value
-        return metadata.agents[agentId]?.alignment ?: KaraokeAlignment.Unspecified
+        return metadata.agents[agentId]?.alignment ?: KaraokeAlignment.Start  // 如果找不到对应的 agent，默认返回 Start
     }
 
     override fun parse(lines: List<String>): SyncedLyrics {
@@ -67,29 +62,7 @@ class TTMLParser : ILyricsParser {
                 val end = endAttribute?.value
                 val translation = translationAttribute?.value
 
-                // 处理子元素中的 x-bg span
-                element.children.forEach { child ->
-                    if (child.name == "span" && child.attributes.any { it.name == "ttm:role" && it.value == "x-bg" }) {
-                        val bgSpanBegin = child.attributes.find { it.name == "begin" }?.value
-                        val bgSpanEnd = child.attributes.find { it.name == "end" }?.value
-                        
-                        if (bgSpanBegin != null && bgSpanEnd != null) {
-                            val accompanimentSyllables = parseSpan(child)
-                            if (accompanimentSyllables.isNotEmpty()) {
-                                parsedLines.add(KaraokeLine(
-                                    syllables = accompanimentSyllables,
-                                    translation = null,
-                                    isAccompaniment = true,
-                                    alignment = getAlignmentFromAgent(child, metadata),
-                                    start = bgSpanBegin.parseAsTime(),
-                                    end = bgSpanEnd.parseAsTime()
-                                ))
-                            }
-                        }
-                    }
-                }
-
-                // 处理普通歌词行
+                // 先处理普通歌词行
                 val syllables = mutableListOf<KaraokeSyllable>()
                 element.children.forEach { child ->
                     if (child.name != "span" || child.attributes.none { it.name == "ttm:role" && it.value == "x-bg" }) {
@@ -107,6 +80,28 @@ class TTMLParser : ILyricsParser {
                         end = end.parseAsTime()
                     )
                     parsedLines.add(currentLine)
+                }
+
+                // 后处理背景音节
+                element.children.forEach { child ->
+                    if (child.name == "span" && child.attributes.any { it.name == "ttm:role" && it.value == "x-bg" }) {
+                        val bgSpanBegin = child.attributes.find { it.name == "begin" }?.value
+                        val bgSpanEnd = child.attributes.find { it.name == "end" }?.value
+                        
+                        if (bgSpanBegin != null && bgSpanEnd != null) {
+                            val accompanimentSyllables = parseSpan(child)
+                            if (accompanimentSyllables.isNotEmpty()) {
+                                parsedLines.add(KaraokeLine(
+                                    syllables = accompanimentSyllables,
+                                    translation = null,
+                                    isAccompaniment = true,
+                                    alignment = getAlignmentFromAgent(element, metadata),
+                                    start = bgSpanBegin.parseAsTime(),
+                                    end = bgSpanEnd.parseAsTime()
+                                ))
+                            }
+                        }
+                    }
                 }
             }
             element.children.forEach { 
