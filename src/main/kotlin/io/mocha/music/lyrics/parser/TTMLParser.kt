@@ -10,37 +10,23 @@ import io.mocha.music.lyrics.utils.parseAsTime
 
 class TTMLParser : ILyricsParser {
 
-    private data class TTMLMetadata(
-        val agents: Map<String, AgentInfo> = emptyMap()
-    )
-
-    private data class AgentInfo(
-        val type: String,
-        val alignment: KaraokeAlignment
-    )
-
-    private fun parseMetadata(element: XmlElement): TTMLMetadata {
-        val metadata = element.children.find { it.name == "metadata" } ?: return TTMLMetadata()
-
-        val agentElements = metadata.children.filter { it.name == "ttm:agent" }
-        val agents = agentElements.mapIndexed { index, agent ->
-            val id = agent.attributes.find { it.name == "xml:id" }?.value ?: ""
-            val type = agent.attributes.find { it.name == "type" }?.value ?: ""
-            id to AgentInfo(
-                type = type,
-                alignment = if (index == 0) KaraokeAlignment.Start else KaraokeAlignment.End
-            )
-        }.toMap()
-
-        return TTMLMetadata(agents)
+    private fun parseMetadata(element: XmlElement): Map<String, KaraokeAlignment> {
+        val metadata = element.children.find { it.name == "metadata" } ?: return emptyMap()
+        
+        return metadata.children
+            .filter { it.name == "ttm:agent" }
+            .mapIndexed { index, agent ->
+                val id = agent.attributes.find { it.name == "xml:id" }?.value ?: ""
+                id to if (index == 0) KaraokeAlignment.Start else KaraokeAlignment.End
+            }.toMap()
     }
 
     private fun getAlignmentFromAgent(
         element: XmlElement,
-        metadata: TTMLMetadata
+        agentAlignments: Map<String, KaraokeAlignment>
     ): KaraokeAlignment {
         val agentId = element.attributes.find { it.name == "ttm:agent" }?.value
-        return metadata.agents[agentId]?.alignment ?: KaraokeAlignment.Start  // 如果找不到对应的 agent，默认返回 Start
+        return agentAlignments[agentId] ?: KaraokeAlignment.Start
     }
 
     override fun parse(lines: List<String>): SyncedLyrics {
@@ -49,7 +35,7 @@ class TTMLParser : ILyricsParser {
         val parser = SimpleXmlParser()
         val rootElement = parser.parse(ttmlContent)
 
-        val metadata = parseMetadata(rootElement)
+        val agentAlignments = parseMetadata(rootElement)
 
         fun traverse(element: XmlElement) {
             if (element.name == "p") {
@@ -61,6 +47,9 @@ class TTMLParser : ILyricsParser {
                 val begin = beginAttribute?.value
                 val end = endAttribute?.value
                 val translation = translationAttribute?.value
+
+                // 获取当前p元素的alignment，后续背景音节会用到
+                val currentAlignment = getAlignmentFromAgent(element, agentAlignments)
 
                 // 先处理普通歌词行
                 val syllables = mutableListOf<KaraokeSyllable>()
@@ -75,14 +64,14 @@ class TTMLParser : ILyricsParser {
                         syllables = syllables,
                         translation = translation,
                         isAccompaniment = false,
-                        alignment = getAlignmentFromAgent(element, metadata),
+                        alignment = currentAlignment,
                         start = begin.parseAsTime(),
                         end = end.parseAsTime()
                     )
                     parsedLines.add(currentLine)
                 }
 
-                // 后处理背景音节
+                // 后处理背景音节，使用相同的alignment
                 element.children.forEach { child ->
                     if (child.name == "span" && child.attributes.any { it.name == "ttm:role" && it.value == "x-bg" }) {
                         val bgSpanBegin = child.attributes.find { it.name == "begin" }?.value
@@ -95,7 +84,7 @@ class TTMLParser : ILyricsParser {
                                     syllables = accompanimentSyllables,
                                     translation = null,
                                     isAccompaniment = true,
-                                    alignment = getAlignmentFromAgent(element, metadata),
+                                    alignment = currentAlignment,  // 使用缓存的alignment
                                     start = bgSpanBegin.parseAsTime(),
                                     end = bgSpanEnd.parseAsTime()
                                 ))
@@ -152,9 +141,5 @@ class TTMLParser : ILyricsParser {
         }
 
         return syllables
-    }
-
-    fun parse(inputString: String): SyncedLyrics {
-        return parse(listOf(inputString))
     }
 }

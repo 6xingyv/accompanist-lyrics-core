@@ -1,10 +1,9 @@
 package io.mocha.music.lyrics.parser
 
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import io.mocha.music.lyrics.model.karaoke.KaraokeAlignment
 import io.mocha.music.lyrics.model.karaoke.KaraokeLine
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
 class TTMLParserTest {
     @Test
