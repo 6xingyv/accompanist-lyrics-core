@@ -8,6 +8,7 @@ import io.mocha.music.lyrics.utils.isDigitsOnly
 
 object LyricifySyllableParser: ILyricsParser {
     private val parser = Regex("(.*?)\\((\\d+),(\\d+)\\)")
+
     override fun parse(lines:List<String>): SyncedLyrics {
         val lyricsLines = AttributesHelper.removeAttributes(lines)
         val data = lyricsLines.map { line->
@@ -15,6 +16,7 @@ object LyricifySyllableParser: ILyricsParser {
         }
         return SyncedLyrics(lines = data)
     }
+
     private fun parseLine(line:String): KaraokeLine {
         val real:String
         var isAccompaniment: Boolean = false
