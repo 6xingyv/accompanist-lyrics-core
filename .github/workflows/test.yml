@@ -1,0 +1,33 @@
+name: Run Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up JDK
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: 'gradle'
+        
+    - name: Setup Gradle
+      uses: gradle/gradle-build-action@v2
+      
+    - name: Run tests
+      run: ./gradlew test --info
+      
+    - name: Publish Test Results
+      uses: mikepenz/action-junit-report@v3
+      if: always()
+      with:
+        report_paths: '**/build/test-results/test/TEST-*.xml'
