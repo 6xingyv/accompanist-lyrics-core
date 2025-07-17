@@ -1,61 +1,64 @@
 package com.mocharealm.accompanist.lyrics.parser
 
 import com.mocharealm.accompanist.lyrics.model.Attributes
-import com.mocharealm.accompanist.lyrics.utils.isDigitsOnly
 
 /**
- * Helper object for parsing and managing attributes from lyrics lines.
- * It uses a regular expression to identify and extract metadata tags and their values.
- *
- * Supported metadata tags include:
- * - `ar`: Artist
- * - `ti`: Title
- * - `al`: Album
- * - `offset`: Offset in milliseconds
- * - `length`: Duration in milliseconds
+ * Helper object for parsing and managing specific, known attributes from lyrics lines.
+ * It identifies lines matching a [tag:value] format and processes only the tags
+ * defined in the METADATA_TAGS set.
  */
-@Suppress("RegExpRedundantEscape")
 object AttributesHelper {
-    private val metadataParser = Regex("\\[(\\D+):(.+)\\]")
+
+    // A set of known, standard metadata tags to be processed or removed.
+    // Any other tags (like 'bg') will be ignored.
+    private val METADATA_TAGS = setOf("ar", "ti", "al", "offset", "length")
+
+    // This regex is still good for finding the general [tag:value] pattern.
+    private val attributeParser = Regex("^\\[([a-zA-Z]+):([^]]*)]$")
 
     /**
-     * Parses a list of lines to extract attributes.
+     * Parses a list of lines to extract values for the known metadata tags.
      *
-     * @param lines The list of strings, where each string is a line from the lyrics file.
+     * @param lines The list of strings from the lyrics file.
      * @return An [Attributes] object containing the parsed metadata.
-     *         If a metadata tag is not found or its value is invalid, the corresponding attribute will hold a default value.
      */
     fun parse(lines: List<String>): Attributes {
-        var metadata = Attributes()
-        for (line in lines) {
-            val data = parseLine(line)
-            if (data != null) {
-                when(data.first) {
-                    "ar"-> metadata = metadata.copy(artist = data.second)
-                    "ti"-> metadata = metadata.copy(title = data.second)
-                    "al"-> metadata = metadata.copy(album = data.second)
-                    "offset"-> metadata = metadata.copy(offset = if (data.second.isDigitsOnly()) data.second.toInt() else 0)
-                    "length"-> metadata = metadata.copy(duration = if (data.second.isDigitsOnly()) data.second.toInt() else 0)
+        val attributesMap = lines.mapNotNull { line ->
+            attributeParser.find(line)?.destructured?.let { (tag, value) ->
+                // Only consider the tag if it's in our known set.
+                if (tag in METADATA_TAGS) {
+                    tag.trim() to value.trim()
+                } else {
+                    null
                 }
             }
-        }
-        return metadata
-    }
-    private fun parseLine(line: String): Pair<String, String>? {
-        return when {
-            metadataParser.matches(line) -> {
-                // 匹配元数据行
-                val matchResult = metadataParser.find(line)
-                val (tag, value) = matchResult!!.destructured
-               tag to value
-            }
+        }.toMap()
 
-            else -> {null}
-        }
+        return Attributes(
+            artist = attributesMap["ar"],
+            title = attributesMap["ti"],
+            album = attributesMap["al"],
+            offset = attributesMap["offset"]?.toIntOrNull() ?: 0,
+            duration = attributesMap["length"]?.toIntOrNull() ?: 0
+        )
     }
+
+    /**
+     * Removes only the lines corresponding to known metadata tags.
+     * Lines like [bg:...] will be ignored and therefore kept.
+     *
+     * @param lines The list of strings to filter.
+     * @return A new list containing only non-metadata lines.
+     */
     fun removeAttributes(lines: List<String>): List<String> {
-        return lines.filter { line->
-            !(metadataParser.matches(line))
+        return lines.filterNot { line ->
+            // Try to parse the line as a generic attribute.
+            attributeParser.find(line)?.destructured?.let { (tag, _) ->
+                // Check if the parsed tag is one of the known metadata tags.
+                // If yes, this line should be removed (return true for filterNot).
+                // If no (e.g., tag is 'bg'), this line should be kept (return false).
+                tag in METADATA_TAGS
+            } == true // If it doesn't match the pattern at all, keep it.
         }
     }
 }
