@@ -28,7 +28,7 @@ class LrcParserTest {
     fun testParseLrcWithTranslation() {
         val lrc ="""
             [00:39.96]I lean in and you move away
-            [00:39.96]我靠在里面，你就搬走
+            [00:39.96]我靠在里面，你就离开
             [00:42.90]
             [00:45.62]But you linger all the same
             [00:45.62]可你依然徘徊不去

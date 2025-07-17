@@ -11,15 +11,15 @@ object LyricifySyllableParser: ILyricsParser {
 
     override fun parse(lines:List<String>): SyncedLyrics {
         val lyricsLines = AttributesHelper.removeAttributes(lines)
-        val data = lyricsLines.map { line->
-            parseLine(line)
+        val data = lyricsLines.mapNotNull { line->
+            if (line.isBlank()) null else parseLine(line)
         }
         return SyncedLyrics(lines = data)
     }
 
     private fun parseLine(line:String): KaraokeLine {
         val real:String
-        var isAccompaniment: Boolean = false
+        var isAccompaniment = false
         val alignment: KaraokeAlignment
         val attributes = mutableListOf<Int>()
         if (line.contains("]") and line.contains("[") and (line.indexOf("]")-line.indexOf("[")==2)) {
@@ -59,6 +59,11 @@ object LyricifySyllableParser: ILyricsParser {
                 end = 0,
             ) }
         }.toList()
-        return KaraokeLine(syllables,null,isAccompaniment,alignment,syllables[0].start,syllables.last().end)
+        
+        // 处理空音节列表的情况
+        val startTime = if (syllables.isNotEmpty()) syllables[0].start else 0
+        val endTime = if (syllables.isNotEmpty()) syllables.last().end else 0
+        
+        return KaraokeLine(syllables, null, isAccompaniment, alignment, startTime, endTime)
     }
 }
