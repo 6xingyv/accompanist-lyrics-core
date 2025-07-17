@@ -20,14 +20,29 @@ jobs:
         distribution: 'temurin'
         cache: 'gradle'
         
+    - name: Cache Gradle build cache
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+          ~/.gradle/daemon
+          .gradle/
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+        
     - name: Make Gradle wrapper executable
       run: chmod +x ./gradlew
         
     - name: Setup Gradle
       uses: gradle/gradle-build-action@v2
+      with:
+        cache-read-only: false
+        gradle-home-cache-cleanup: true
       
     - name: Run tests
-      run: ./gradlew test --info
+      run: ./gradlew test --info --build-cache
       
     - name: Publish Test Results
       uses: mikepenz/action-junit-report@v3

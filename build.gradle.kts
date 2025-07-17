@@ -2,8 +2,8 @@ plugins {
     kotlin("jvm") version "2.0.0"
 }
 
-group = "io.mocha"
-version = "1.0-SNAPSHOT"
+group = "com.mocharealm.accompanist"
+version = "1.0.0"
 
 repositories {
     mavenCentral()
