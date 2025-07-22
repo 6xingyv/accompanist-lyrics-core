@@ -49,9 +49,9 @@ class LyricifySyllableParserTest {
         assertEquals(3, data.lines.size)
 
         // 验证对齐方式
-        assertEquals(KaraokeAlignment.Start, (data.lines[0] as KaraokeLine).alignment)
-        assertEquals(KaraokeAlignment.End, (data.lines[1] as KaraokeLine).alignment)
-        assertEquals(KaraokeAlignment.Start, (data.lines[2] as KaraokeLine).alignment)
+        assertEquals(KaraokeAlignment.End, (data.lines[0] as KaraokeLine).alignment)
+        assertEquals(KaraokeAlignment.Start, (data.lines[1] as KaraokeLine).alignment)
+        assertEquals(KaraokeAlignment.End, (data.lines[2] as KaraokeLine).alignment)
 
         // 验证伴唱标识
         assertFalse((data.lines[0] as KaraokeLine).isAccompaniment)

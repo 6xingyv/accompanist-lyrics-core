@@ -21,7 +21,7 @@ Add the following to your `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.mocharealm.accompanist:accompanist-lyrics:0.0.1")
+    implementation("com.mocharealm.accompanist:accompanist-lyrics:0.0.2")
 }
 ```
 

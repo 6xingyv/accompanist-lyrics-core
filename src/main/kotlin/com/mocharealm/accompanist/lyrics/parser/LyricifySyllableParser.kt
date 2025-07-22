@@ -36,9 +36,9 @@ object LyricifySyllableParser: ILyricsParser {
                 isAccompaniment = true
             }
             alignment = if ( attribute==2 || attribute==5 || attribute==8) {
-                KaraokeAlignment.Start
-            } else {
                 KaraokeAlignment.End
+            } else {
+                KaraokeAlignment.Start
             }
 
         }
