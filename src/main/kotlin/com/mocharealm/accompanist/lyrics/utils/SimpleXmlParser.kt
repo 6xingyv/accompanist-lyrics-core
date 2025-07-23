@@ -69,17 +69,34 @@ internal class SimpleXmlParser {
                 else -> {
                     // 处理文本内容
                     val nextTagIndex = cleanXml.indexOf('<', i)
-                    if (nextTagIndex != -1) {
-                        val text = cleanXml.substring(i, nextTagIndex).trim()
-                        if (text.isNotEmpty() && stack.isNotEmpty()) {
+                    if (nextTagIndex == -1) { break } // End of document
+
+                    val rawText = cleanXml.substring(i, nextTagIndex)
+
+                    if (rawText.isNotEmpty() && stack.isNotEmpty()) {
+                        val trimmedText = rawText.trim()
+
+                        // 案例 1: 如果是有效字符，它属于当前栈顶元素的内部文本。
+                        // 例如 `<span>Ya</span>` 中的 "Ya"
+                        if (trimmedText.isNotEmpty()) {
                             val currentElement = stack.pop()
-                            val newElement = currentElement.copy(text = currentElement.text + text)
-                            stack.push(newElement)
+                            stack.push(currentElement.copy(text = currentElement.text + trimmedText))
                         }
-                        i = nextTagIndex
-                    } else {
-                        break
+
+                        // 案例 2: 如果原始文本不等于trim后的文本，说明存在纯空格。
+                        // 这些空格应该作为一个独立的文本节点，成为父元素的子节点。
+                        // 例如 `</span> <span` 中的 " "
+                        val whitespace = rawText.replace(trimmedText, "")
+                        if (whitespace.isNotEmpty()) {
+                            // 在关闭标签后，栈顶就是父元素
+                            val textNode = XmlElement(name = "#text", text = whitespace, attributes = emptyList(), children = emptyList())
+                            val parent = stack.peek()
+                            val newChildren = parent.children.toMutableList().apply { add(textNode) }
+                            stack.pop() // pop and push to update the element with new children
+                            stack.push(parent.copy(children = newChildren))
+                        }
                     }
+                    i = nextTagIndex
                 }
             }
         }
