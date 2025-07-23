@@ -1,5 +1,7 @@
 # Accompanist Lyrics
 
+[![Tests](https://img.shields.io/github/actions/workflow/status/Mocha-Realm/Accompanist-Lyrics/test.yml?branch=main&label=Tests)](https://github.com/Mocha-Realm/Accompanist-Lyrics/actions/workflows/test.yml)
+
 A general-purpose, extensible lyrics library for Kotlin/JVM. Accompanist Lyrics supports multiple popular lyrics formats with a unified data model for easy integration into music players, karaoke apps, and more.
 
 ---
@@ -17,11 +19,13 @@ A general-purpose, extensible lyrics library for Kotlin/JVM. Accompanist Lyrics 
 
 ## Installation
 
+[![Maven Central](https://img.shields.io/maven-central/v/com.mocharealm.accompanist/accompanist-lyrics)](https://central.sonatype.com/artifact/com.mocharealm.accompanist/accompanist-lyrics)
+
 Add the following to your `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.mocharealm.accompanist:accompanist-lyrics:0.0.2")
+    implementation("com.mocharealm.accompanist:accompanist-lyrics:VERSION")
 }
 ```
 
@@ -30,8 +34,6 @@ dependencies {
 ## Usage
 
 ```kotlin
-import com.mocharealm.accompanist.lyrics.parser.LrcParser
-
 val lrcLines = listOf(
     "[00:39.96]I lean in and you move away",
     "[00:39.96]我靠在里面，你就离开"
@@ -60,6 +62,7 @@ To add a new format, implement the `ILyricsParser` interface:
 ```kotlin
 interface ILyricsParser {
     fun parse(lines: List<String>): SyncedLyrics
+    fun parse(lines: String): SyncedLyrics
 }
 ```
 
