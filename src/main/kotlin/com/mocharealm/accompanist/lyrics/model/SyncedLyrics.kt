@@ -1,13 +1,5 @@
 package com.mocharealm.accompanist.lyrics.model
 
-/**
- * Represents synced lyrics for a song.
- *
- * @property lines A list of [ISyncedLine] objects, each representing a line of lyrics with timing information.
- * @property title The title of the song. Defaults to an empty string.
- * @property id The unique identifier for the lyrics. Defaults to "0".
- * @property artists A list of artists who performed the song. Defaults to an empty list.
- */
 data class SyncedLyrics(
     val lines: List<ISyncedLine>,
     val title: String = "",
@@ -30,24 +22,23 @@ data class SyncedLyrics(
     fun getCurrentFirstHighlightLineIndexByTime(time: Int): Int {
         if (lines.isEmpty()) return 0
 
-        val searchResult = lines.binarySearchBy(key = time) { line ->
+        var low = 0
+        var high = lines.size - 1
+
+        while (low <= high) {
+            val mid = (low + high) / 2
+            val line = lines[mid]
+
             when {
-                time < line.start -> 1
-                time > line.end -> -1
-                else -> 0
+                time in line.start..line.end -> return mid
+                time < line.start -> high = mid - 1
+                else -> low = mid + 1
             }
         }
 
-        return if (searchResult >= 0) {
-            // Exact match found (time is within line.start..line.end)
-            searchResult
-        } else {
-            // Not found, searchResult = (-(insertion point) - 1)
-            // We need the insertion point: -(searchResult + 1)
-            // This is the index where the element would be inserted to maintain order.
-            // This corresponds to your original logic: "when low < lines.size -> low else -> lines.size"
-            val insertionPoint = -(searchResult + 1)
-            insertionPoint
+        return when {
+            low < lines.size -> low
+            else -> lines.size
         }
     }
 }
