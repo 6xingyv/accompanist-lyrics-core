@@ -3,11 +3,11 @@ package com.mocharealm.accompanist.lyrics.parser
 import com.mocharealm.accompanist.lyrics.model.Attributes
 
 /**
- * Helper object for parsing and managing specific, known attributes from lyrics lines.
+ * Helper object for parsing and managing specific, known metadata from lyrics lines.
  * It identifies lines matching a [tag:value] format and processes only the tags
  * defined in the METADATA_TAGS set.
  */
-object AttributesHelper {
+object LrcMetadataHelper {
 
     // A set of known, standard metadata tags to be processed or removed.
     // Any other tags (like 'bg') will be ignored.

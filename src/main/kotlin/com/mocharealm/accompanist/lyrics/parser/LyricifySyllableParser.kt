@@ -15,7 +15,7 @@ object LyricifySyllableParser: ILyricsParser {
     private val parser = Regex("(.*?)\\((\\d+),(\\d+)\\)")
 
     override fun parse(lines:List<String>): SyncedLyrics {
-        val lyricsLines = AttributesHelper.removeAttributes(lines)
+        val lyricsLines = LrcMetadataHelper.removeAttributes(lines)
         val data = lyricsLines.mapNotNull { line->
             if (line.isBlank()) null else parseLine(line)
         }

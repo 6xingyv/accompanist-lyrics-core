@@ -14,7 +14,7 @@ object EnhancedLrcParser : ILyricsParser {
     override fun parse(lines: List<String>): SyncedLyrics {
         // FIX: Removed the call to AttributesHelper.removeAttributes(lines)
         // This was the root cause, as it was incorrectly filtering out [bg:...] lines.
-        val lyricsLines = AttributesHelper.removeAttributes(lines)
+        val lyricsLines = LrcMetadataHelper.removeAttributes(lines)
         val data = lyricsLines
             .mapNotNull { line -> parseLine(line) }
             .combineRawWithTranslation()

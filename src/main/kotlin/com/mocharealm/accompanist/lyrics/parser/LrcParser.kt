@@ -13,7 +13,7 @@ object LrcParser : ILyricsParser {
     private val parser = Regex("\\[(\\d{1,2}:\\d{1,2}\\.\\d{2,3})](.*)")
 
     override fun parse(lines: List<String>): SyncedLyrics {
-        val lyricsLines = AttributesHelper.removeAttributes(lines)
+        val lyricsLines = LrcMetadataHelper.removeAttributes(lines)
         val data = lyricsLines
             .flatMap { line -> parseLine(line) }
             .rearrangeTime()
