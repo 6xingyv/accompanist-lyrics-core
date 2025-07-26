@@ -66,17 +66,6 @@ object AutoParser : ILyricsParser {
         val format = guesser.guessFormat(content)
         val parser = format?.name?.let { parsers[it] }
 
-        return if (parser != null) {
-            // Some parsers prefer the full string, others prefer lines.
-            // The parser's implementation of ILyricsParser will handle this.
-            if (format.name == "TTML") {
-                parser.parse(content)
-            } else {
-                parser.parse(content.split('\n'))
-            }
-        } else {
-            // If format is unknown or no parser is registered, return empty lyrics.
-            SyncedLyrics(lines = emptyList())
-        }
+        return parser?.parse(content.split('\n')) ?: SyncedLyrics(lines = emptyList())
     }
 }

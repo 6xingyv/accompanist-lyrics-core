@@ -11,11 +11,22 @@ import com.mocharealm.accompanist.lyrics.utils.parseAsTime
 /**
  * A parser for lyrics in the TTML(Apple Syllable) format.
  *
- * It correctly handles word spacing by interpreting text nodes between syllable tags.
  * More information about TTML(Apple Syllable) format can be found [here](https://help.apple.com/itc/videoaudioassetguide/#/itc0f14fecdd).
  */
 object TTMLParser : ILyricsParser {
+    override fun parse(lines: List<String>): SyncedLyrics {
+        return parse(lines.joinToString("") { it.trimIndent() })
+    }
+
+    // Fucking AMLL and other getter not obeying the rules
+    private fun preformattingTTML(content: String): String =
+        content
+            .replace("  ","")
+            .replace(" </span><span", "</span> <span")
+            .replace(",</span><span", ",</span> <span")
+
     override fun parse(content: String): SyncedLyrics {
+        val content = preformattingTTML(content)
         val parsedLines = mutableListOf<KaraokeLine>()
         val parser = SimpleXmlParser()
         val rootElement = parser.parse(content)
@@ -41,14 +52,16 @@ object TTMLParser : ILyricsParser {
                 val syllables = parseSyllablesFromChildren(pElement.children)
 
                 if (syllables.isNotEmpty()) {
-                    parsedLines.add(KaraokeLine(
-                        syllables = syllables,
-                        translation = pLevelTranslationSpan?.text?.trim(),
-                        isAccompaniment = false,
-                        alignment = currentAlignment,
-                        start = begin.parseAsTime(),
-                        end = end.parseAsTime()
-                    ))
+                    parsedLines.add(
+                        KaraokeLine(
+                            syllables = syllables,
+                            translation = pLevelTranslationSpan?.text?.trim(),
+                            isAccompaniment = false,
+                            alignment = currentAlignment,
+                            start = begin.parseAsTime(),
+                            end = end.parseAsTime()
+                        )
+                    )
                 }
 
                 // 处理背景音节
@@ -60,22 +73,26 @@ object TTMLParser : ILyricsParser {
                         val bgSpanEnd = child.attributes.find { it.name == "end" }?.value
 
 
-                            val accompanimentSyllables = parseSyllablesFromChildren(child.children)
-                            if (accompanimentSyllables.isNotEmpty()) {
-                                // 查找背景音节内部的翻译
-                                val bgTranslationSpan = child.children.find { bgChild ->
-                                    bgChild.attributes.any { it.name.endsWith(":role") && it.value == "x-translation" }
-                                }
+                        val accompanimentSyllables = parseSyllablesFromChildren(child.children)
+                        if (accompanimentSyllables.isNotEmpty()) {
+                            // 查找背景音节内部的翻译
+                            val bgTranslationSpan = child.children.find { bgChild ->
+                                bgChild.attributes.any { it.name.endsWith(":role") && it.value == "x-translation" }
+                            }
 
-                                parsedLines.add(KaraokeLine(
+                            parsedLines.add(
+                                KaraokeLine(
                                     syllables = accompanimentSyllables,
                                     translation = bgTranslationSpan?.text?.trim(),
                                     isAccompaniment = true,
                                     alignment = currentAlignment,
-                                    start = bgSpanBegin?.parseAsTime() ?: accompanimentSyllables.first().start,
-                                    end = bgSpanEnd?.parseAsTime() ?: accompanimentSyllables.last().end
-                                ))
-                            }
+                                    start = bgSpanBegin?.parseAsTime()
+                                        ?: accompanimentSyllables.first().start,
+                                    end = bgSpanEnd?.parseAsTime()
+                                        ?: accompanimentSyllables.last().end
+                                )
+                            )
+                        }
 
                     }
                 }
@@ -107,7 +124,10 @@ object TTMLParser : ILyricsParser {
                     // Look ahead to the next sibling to see if it's a whitespace text node.
                     // This indicates a space between words (syllables).
                     val nextSibling = children.getOrNull(i + 1)
-                    if (nextSibling != null && nextSibling.name == "#text" && nextSibling.text.contains(" ")) {
+                    if (nextSibling != null && nextSibling.name == "#text" && nextSibling.text.contains(
+                            " "
+                        )
+                    ) {
                         syllableContent += " "
                     }
 
@@ -125,7 +145,8 @@ object TTMLParser : ILyricsParser {
         // Trim the trailing space from the very last syllable of the line.
         if (syllables.isNotEmpty()) {
             val lastSyllable = syllables.last()
-            syllables[syllables.lastIndex] = lastSyllable.copy(content = lastSyllable.content.trimEnd())
+            syllables[syllables.lastIndex] =
+                lastSyllable.copy(content = lastSyllable.content.trimEnd())
         }
 
         return syllables
