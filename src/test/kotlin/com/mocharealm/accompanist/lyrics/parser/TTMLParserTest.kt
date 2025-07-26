@@ -2,6 +2,7 @@ package com.mocharealm.accompanist.lyrics.parser
 
 import com.mocharealm.accompanist.lyrics.model.karaoke.KaraokeAlignment
 import com.mocharealm.accompanist.lyrics.model.karaoke.KaraokeLine
+import com.mocharealm.accompanist.lyrics.utils.parseAsTime
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -93,7 +94,6 @@ class TTMLParserTest {
             </div></body></tt>
             """.trimIndent()
 
-        // 修改点: 直接传递TTML字符串
         val result = TTMLParser.parse(ttml)
 
         assertEquals(2, result.lines.size)
@@ -111,7 +111,37 @@ class TTMLParserTest {
 
         // 背景音节行应该有自己的翻译
         assertEquals("背景和声", bgLine.translation)
-        // 新增验证: "background" 和 "harmony" 之间没有空格
+        // "background" 和 "harmony" 之间没有空格
         assertEquals("backgroundharmony", bgLine.syllables.joinToString("") { it.content }.trim())
+    }
+
+    @Test
+    fun testBgWithoutSpanStartAndEnd() {
+        val ttml = """
+            <tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata"><body><div>
+            <p begin="00:00.100" end="00:03.000">
+                <span begin="00:00.100" end="00:00.500">Main</span> <span begin="00:00.500" end="00:01.000">vocals</span>
+                <span ttm:role="x-bg">
+                    <span begin="00:01.500" end="00:02.000">background</span> <span begin="00:02.000" end="00:02.500">harmony</span>
+                    <span ttm:role="x-translation" xml:lang="zh-CN">背景和声</span>
+                </span>
+                <span ttm:role="x-translation" xml:lang="zh-CN">主歌声</span>
+            </p>
+            </div></body></tt>
+            """.trimIndent()
+
+        val result = TTMLParser.parse(ttml)
+
+        assertEquals(2, result.lines.size)
+
+        val mainLine = result.lines.find { !(it as KaraokeLine).isAccompaniment } as? KaraokeLine
+        val bgLine = result.lines.find { (it as KaraokeLine).isAccompaniment } as? KaraokeLine
+
+        assertNotNull(mainLine)
+        assertNotNull(bgLine)
+
+        assertTrue(bgLine.isAccompaniment)
+        assertEquals("00:01.500".parseAsTime(),bgLine.start)
+        assertEquals("00:02.500".parseAsTime(),bgLine.end)
     }
 }

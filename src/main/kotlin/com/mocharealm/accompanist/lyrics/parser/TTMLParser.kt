@@ -59,7 +59,7 @@ object TTMLParser : ILyricsParser {
                         val bgSpanBegin = child.attributes.find { it.name == "begin" }?.value
                         val bgSpanEnd = child.attributes.find { it.name == "end" }?.value
 
-                        if (bgSpanBegin != null && bgSpanEnd != null) {
+
                             val accompanimentSyllables = parseSyllablesFromChildren(child.children)
                             if (accompanimentSyllables.isNotEmpty()) {
                                 // 查找背景音节内部的翻译
@@ -72,11 +72,11 @@ object TTMLParser : ILyricsParser {
                                     translation = bgTranslationSpan?.text?.trim(),
                                     isAccompaniment = true,
                                     alignment = currentAlignment,
-                                    start = bgSpanBegin.parseAsTime(),
-                                    end = bgSpanEnd.parseAsTime()
+                                    start = bgSpanBegin?.parseAsTime() ?: accompanimentSyllables.first().start,
+                                    end = bgSpanEnd?.parseAsTime() ?: accompanimentSyllables.last().end
                                 ))
                             }
-                        }
+
                     }
                 }
             }
