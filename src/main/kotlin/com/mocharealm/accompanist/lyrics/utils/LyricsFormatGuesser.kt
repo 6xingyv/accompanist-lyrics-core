@@ -9,7 +9,9 @@ class LyricsFormatGuesser {
     private val registeredFormats = mutableListOf<LyricsFormat>()
 
     init {
-        registerFormat(LyricsFormat("TTML") { it.contains("<tt.*xmlns.*=.*http://www.w3.org/ns/ttml.*>".toRegex()) })
+        registerFormat(LyricsFormat("TTML") {
+            it.contains("<tt.*xmlns.*=.*http://www.w3.org/ns/ttml.*>".toRegex(RegexOption.DOT_MATCHES_ALL))
+        })
 
         // WARNING: DO NOT CHANGE THE LRC AND ENHANCED_LRC ORDER
         registerFormat(LyricsFormat("LRC") { it.contains("\\[\\d{2}:\\d{2}\\.\\d{2,3}].+".toRegex()) })
