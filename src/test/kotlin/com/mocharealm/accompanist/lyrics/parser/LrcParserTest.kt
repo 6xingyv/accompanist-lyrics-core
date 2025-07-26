@@ -1,6 +1,9 @@
 package com.mocharealm.accompanist.lyrics.parser
 
+import com.mocharealm.accompanist.lyrics.model.synced.SyncedLine
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 
 class LrcParserTest {
     @Test
@@ -20,8 +23,15 @@ class LrcParserTest {
             [02:44.27]
             [02:51.03]I can still feel you by my side
         """.trimIndent().split("\n")
-        val data = LrcParser.parse(lrc)
-        println(data.lines.toString())
+        val result = LrcParser.parse(lrc)
+        assertEquals(6, result.lines.size)
+        val line = result.lines.getOrNull(0) as? SyncedLine
+
+        assertNotNull(line)
+
+        assertEquals("You're on my mind", line.content)
+        assertEquals(25500, line.start)
+        assertEquals(28250, line.end)
     }
 
     @Test
@@ -33,7 +43,12 @@ class LrcParserTest {
             [00:45.62]But you linger all the same
             [00:45.62]可你依然徘徊不去
         """.trimIndent().split("\n")
-        val data = LrcParser.parse(lrc)
-        println(data.lines.toString())
+        val result = LrcParser.parse(lrc)
+        assertEquals(2, result.lines.size)
+        val line = result.lines.getOrNull(0) as? SyncedLine
+        assertNotNull(line)
+        assertEquals("I lean in and you move away", line.content)
+        assertEquals("我靠在里面，你就离开", line.translation)
+        assertEquals(39960, line.start)
     }
 }
