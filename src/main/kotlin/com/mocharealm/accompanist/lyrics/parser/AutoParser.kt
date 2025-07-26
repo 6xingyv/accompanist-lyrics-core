@@ -1,6 +1,7 @@
 package com.mocharealm.accompanist.lyrics.parser
 
 import com.mocharealm.accompanist.lyrics.model.SyncedLyrics
+import com.mocharealm.accompanist.lyrics.model.synced.SyncedLine
 import com.mocharealm.accompanist.lyrics.utils.LyricsFormatGuesser
 
 /**
@@ -12,9 +13,7 @@ import com.mocharealm.accompanist.lyrics.utils.LyricsFormatGuesser
  *
  * This parser is extensible. You can register custom formats and their corresponding parsers.
  */
-object AutoParser : ILyricsParser {
-
-    private val guesser = LyricsFormatGuesser()
+class AutoParser(private val guesser: LyricsFormatGuesser) : ILyricsParser {
     private val parsers = mutableMapOf<String, ILyricsParser>()
 
     init {
@@ -66,6 +65,26 @@ object AutoParser : ILyricsParser {
         val format = guesser.guessFormat(content)
         val parser = format?.name?.let { parsers[it] }
 
-        return parser?.parse(content.split('\n')) ?: SyncedLyrics(lines = emptyList())
+        return parser?.parse(content.split("\n"))
+            ?: SyncedLyrics(lines = emptyList())
+    }
+
+    class Builder {
+        private val guesser = LyricsFormatGuesser()
+        private val customParsers = mutableMapOf<String, ILyricsParser>()
+
+        fun withFormat(format: LyricsFormatGuesser.LyricsFormat, parser: ILyricsParser): Builder {
+            guesser.registerFormat(format)
+            customParsers[format.name] = parser
+            return this
+        }
+
+        fun build(): AutoParser {
+            val autoParser = AutoParser(guesser)
+            customParsers.forEach { (name, parser) ->
+                autoParser.registerParser(name, parser)
+            }
+            return autoParser
+        }
     }
 }
