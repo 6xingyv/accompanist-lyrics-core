@@ -15,9 +15,6 @@ import com.mocharealm.accompanist.lyrics.utils.parseAsTime
  * More information about TTML(Apple Syllable) format can be found [here](https://help.apple.com/itc/videoaudioassetguide/#/itc0f14fecdd).
  */
 object TTMLParser : ILyricsParser {
-
-    // Override the parse method that takes a single String.
-    // The `parse(lines: List<String>)` method will be handled by the interface's default implementation.
     override fun parse(content: String): SyncedLyrics {
         val parsedLines = mutableListOf<KaraokeLine>()
         val parser = SimpleXmlParser()

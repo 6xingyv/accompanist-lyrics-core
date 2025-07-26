@@ -1,14 +1,11 @@
 package com.mocharealm.accompanist.lyrics.utils
 
 class LyricsFormatGuesser {
-
-    // Data class to represent a lyrics format and its detection logic
     data class LyricsFormat(
         val name: String,
         val detector: (String) -> Boolean
     )
 
-    // A mutable list to hold the registered formats
     private val registeredFormats = mutableListOf<LyricsFormat>()
 
     init {
