@@ -1,6 +1,7 @@
 package com.mocharealm.accompanist.lyrics.model.synced
 
 import com.mocharealm.accompanist.lyrics.model.ISyncedLine
+import com.mocharealm.accompanist.lyrics.model.karaoke.KaraokeLine
 
 data class SyncedLine(
     val content: String,
@@ -25,4 +26,13 @@ data class UncheckedSyncedLine(
     fun toSyncedLine():SyncedLine {
         return SyncedLine(this.content,this.translation,this.start,this.end)
     }
+}
+
+fun KaraokeLine.toSyncedLine(): SyncedLine {
+    return SyncedLine(
+        content = this.syllables.joinToString("") { it.content }.trim(),
+        translation = this.translation,
+        start = this.start,
+        end = this.end
+    )
 }

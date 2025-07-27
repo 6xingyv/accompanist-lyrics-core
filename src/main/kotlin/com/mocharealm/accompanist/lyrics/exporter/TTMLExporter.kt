@@ -1,0 +1,104 @@
+package com.mocharealm.accompanist.lyrics.exporter
+
+import com.mocharealm.accompanist.lyrics.model.SyncedLyrics
+import com.mocharealm.accompanist.lyrics.model.karaoke.KaraokeAlignment
+import com.mocharealm.accompanist.lyrics.model.karaoke.KaraokeLine
+import com.mocharealm.accompanist.lyrics.model.karaoke.KaraokeSyllable
+import com.mocharealm.accompanist.lyrics.utils.toTimeFormattedString
+
+object TTMLExporter : ILyricsExporter {
+
+    override fun export(lyrics: SyncedLyrics): String {
+        if (lyrics.lines.isEmpty()) return ""
+
+        val builder = StringBuilder()
+        val hasAlignmentData = lyrics.lines.run {
+            var hasStart = false
+            var hasEnd = false
+
+            if (lyrics.lines.isEmpty()) {
+                false
+            }
+
+            for (line in lyrics.lines) {
+                if (line is KaraokeLine) {
+                    when (line.alignment) {
+                        KaraokeAlignment.Start -> hasStart = true
+                        KaraokeAlignment.End -> hasEnd = true
+                        else -> {}
+                    }
+                }
+                if (hasStart && hasEnd) {
+                    break
+                }
+            }
+            hasStart && hasEnd
+        }
+
+        builder.appendLine("""<?xml version="1.0" encoding="UTF-8"?>""")
+        builder.appendLine("""<tt xmlns="http://www.w3.org/ns/ttml" xmlns:itunes="http://music.apple.com/lyric-ttml-internal" xmlns:ttm="http://www.w3.org/ns/ttml#metadata" itunes:timing="Word">""")
+
+        builder.appendLine("  <head>")
+        if (hasAlignmentData) {
+            builder.appendLine("    <metadata>")
+            builder.appendLine("""      <ttm:agent type="person" xml:id="v1"/>""")
+            builder.appendLine("""      <ttm:agent type="person" xml:id="v2"/>""")
+            builder.appendLine("    </metadata>")
+        }
+        builder.appendLine("  </head>")
+
+        val totalDuration = lyrics.lines.maxOfOrNull { it.end } ?: 0
+        builder.appendLine("""  <body dur="${totalDuration.toTimeFormattedString()}">""")
+
+        val firstLineTime = lyrics.lines.first().start
+        builder.appendLine("""    <div begin="${firstLineTime.toTimeFormattedString()}" end="${totalDuration.toTimeFormattedString()}">""")
+
+        lyrics.lines.filterIsInstance<KaraokeLine>().forEach { line ->
+            appendPElement(builder, line)
+        }
+
+        builder.appendLine("    </div>")
+        builder.appendLine("  </body>")
+        builder.appendLine("</tt>")
+
+        return builder.toString()
+    }
+
+    private fun appendPElement(builder: StringBuilder, line: KaraokeLine) {
+        val agent = when (line.alignment) {
+            KaraokeAlignment.Start -> """ ttm:agent="v1""""
+            KaraokeAlignment.End -> """ ttm:agent="v2""""
+            else -> ""
+        }
+        val pTag = """<p begin="${line.start.toTimeFormattedString()}" end="${line.end.toTimeFormattedString()}"$agent>"""
+        builder.append("      $pTag")
+
+        fun buildContent(syllables: List<KaraokeSyllable>, translation: String?) {
+            syllables.forEach { syllable ->
+                val content = syllable.content
+                val trimmedContent = content.trim()
+                val escapedContent = trimmedContent
+                    .replace("&", "&amp;")
+                    .replace("<", "&lt;")
+                    .replace(">", "&gt;")
+
+                builder.append("""<span begin="${syllable.start.toTimeFormattedString()}" end="${syllable.end.toTimeFormattedString()}">$escapedContent</span>""")
+                if (content.endsWith(' ')) {
+                    builder.append(" ")
+                }
+            }
+            if (translation != null) {
+                builder.append("""<span ttm:role="x-translation" xml:lang="zh-CN">${translation.trim()}</span>""")
+            }
+        }
+
+        if (line.isAccompaniment) {
+            builder.append("""<span ttm:role="x-bg" begin="${line.start.toTimeFormattedString()}" end="${line.end.toTimeFormattedString()}">""")
+            buildContent(line.syllables, line.translation)
+            builder.append("""</span>""")
+        } else {
+            buildContent(line.syllables, line.translation)
+        }
+        builder.appendLine("</p>")
+    }
+}

@@ -1,6 +1,7 @@
 package com.mocharealm.accompanist.lyrics.model.karaoke
 
 import com.mocharealm.accompanist.lyrics.model.ISyncedLine
+import com.mocharealm.accompanist.lyrics.model.synced.SyncedLine
 
 data class KaraokeLine(
     val syllables: List<KaraokeSyllable>,
@@ -32,4 +33,15 @@ data class KaraokeLine(
         else
             return current in (start - 800)..(end + 800)
     }
+}
+
+fun SyncedLine.toKaraokeLine(): KaraokeLine {
+    return KaraokeLine(
+        syllables = listOf(KaraokeSyllable(this.content, this.start, this.end)),
+        translation = this.translation,
+        isAccompaniment = false,
+        alignment = KaraokeAlignment.Unspecified,
+        start = this.start,
+        end = this.end
+    )
 }

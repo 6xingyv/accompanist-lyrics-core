@@ -45,3 +45,20 @@ internal fun String.parseAsTime(): Int {
         0
     }
 }
+
+internal fun Int.toTimeFormattedString(): String {
+    val totalMillis = this
+    if (totalMillis < 0) return "00:00:00.000"
+
+    val hours = totalMillis / 3600_000
+    val minutes = (totalMillis % 3600_000) / 60_000
+    val seconds = (totalMillis % 60_000) / 1000
+    val millis = totalMillis % 1000
+
+    val h = hours.toString().padStart(2, '0')
+    val m = minutes.toString().padStart(2, '0')
+    val s = seconds.toString().padStart(2, '0')
+    val ms = millis.toString().padStart(3, '0')
+
+    return "$h:$m:$s.$ms"
+}
