@@ -4,7 +4,7 @@ data class SyncedLyrics(
     val lines: List<ISyncedLine>,
     val title: String = "",
     val id: String = "0",
-    val artists: List<String>? = listOf<String>(),
+    val artists: List<String>? = emptyList(),
 ) {
     /**
      * Gets the index of the first line that should be highlighted at the given time.
@@ -24,21 +24,27 @@ data class SyncedLyrics(
 
         var low = 0
         var high = lines.size - 1
+        var resultIndex = lines.size
 
         while (low <= high) {
-            val mid = (low + high) / 2
+            val mid = low + (high - low) / 2
             val line = lines[mid]
 
-            when {
-                time in line.start..line.end -> return mid
-                time < line.start -> high = mid - 1
-                else -> low = mid + 1
+            if (line.start > time) {
+                resultIndex = mid
+                high = mid - 1
+            } else if (line.end < time) {
+                low = mid + 1
+            } else {
+                resultIndex = mid
+                high = mid - 1
             }
         }
 
-        return when {
-            low < lines.size -> low
-            else -> lines.size
+        return if (resultIndex < lines.size && time in lines[resultIndex].start..lines[resultIndex].end) {
+            resultIndex
+        } else {
+            low.coerceAtMost(lines.size)
         }
     }
 }
