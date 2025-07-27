@@ -1,6 +1,5 @@
 package com.mocharealm.accompanist.lyrics.utils
 
-import java.util.Stack
 
 internal data class XmlAttribute(
     val name: String,
@@ -17,83 +16,72 @@ internal data class XmlElement(
 internal class SimpleXmlParser {
     fun parse(xml: String): XmlElement {
         val cleanXml = xml.replace(Regex("\\s+"), " ").trim()
-        val stack = Stack<XmlElement>()
+        val stack = ArrayDeque<XmlElement>() // Use ArrayDeque for stack operations
         var i = 0
 
         while (i < cleanXml.length) {
             when {
                 cleanXml[i] == '<' -> {
-                    if (cleanXml[i + 1] == '/') {
-                        // 处理结束标签
+                    if (i + 1 < cleanXml.length && cleanXml[i + 1] == '/') {
+                        // Handle closing tag
                         val endIndex = cleanXml.indexOf('>', i + 1)
                         if (stack.size > 1) {
-                            val currentElement = stack.pop()
-                            val parent = stack.peek()
-                            val newChildren = parent.children.toMutableList()
-                            newChildren.add(currentElement)
-                            stack.pop()
-                            stack.push(parent.copy(children = newChildren))
+                            val currentElement = stack.removeLast()
+                            val parent = stack.removeLast() // Pop parent
+                            val newChildren = parent.children.toMutableList().apply { add(currentElement) }
+                            stack.addLast(parent.copy(children = newChildren)) // Push updated parent back
                         }
                         i = endIndex + 1
                     } else {
-                        // 处理开始标签
+                        // Handle opening tag
                         val endIndex = cleanXml.indexOf('>', i + 1)
                         val tagPart = cleanXml.substring(i + 1, endIndex)
 
-                        // 检查是否为自闭合标签
                         val isSelfClosing = tagPart.endsWith("/")
-                        val actualTagPart =
-                            if (isSelfClosing) tagPart.dropLast(1).trim() else tagPart
+                        val actualTagPart = if (isSelfClosing) tagPart.dropLast(1).trim() else tagPart
 
                         val (tagName, attributes) = parseTagAndAttributes(actualTagPart)
                         val newElement = XmlElement(tagName, attributes, emptyList(), "")
 
                         if (isSelfClosing) {
-                            // 自闭合标签直接添加到父元素
                             if (stack.isNotEmpty()) {
-                                val parent = stack.peek()
-                                val newChildren = parent.children.toMutableList()
-                                newChildren.add(newElement)
-                                stack.pop()
-                                stack.push(parent.copy(children = newChildren))
+                                val parent = stack.removeLast() // Pop
+                                val newChildren = parent.children.toMutableList().apply { add(newElement) }
+                                stack.addLast(parent.copy(children = newChildren)) // Push updated
                             } else {
-                                stack.push(newElement)
+                                stack.addLast(newElement) // This becomes the root
                             }
                         } else {
-                            stack.push(newElement)
+                            stack.addLast(newElement)
                         }
                         i = endIndex + 1
                     }
                 }
-
                 else -> {
-                    // 处理文本内容
+                    // Handle text content
                     val nextTagIndex = cleanXml.indexOf('<', i)
-                    if (nextTagIndex == -1) { break } // End of document
+                    if (nextTagIndex == -1) break
 
                     val rawText = cleanXml.substring(i, nextTagIndex)
 
                     if (rawText.isNotEmpty() && stack.isNotEmpty()) {
                         val trimmedText = rawText.trim()
 
-                        // 案例 1: 如果是有效字符，它属于当前栈顶元素的内部文本。
-                        // 例如 `<span>Ya</span>` 中的 "Ya"
+                        // Case 1: Add to current element's text
                         if (trimmedText.isNotEmpty()) {
-                            val currentElement = stack.pop()
-                            stack.push(currentElement.copy(text = currentElement.text + trimmedText))
+                            val currentElement = stack.removeLast()
+                            stack.addLast(currentElement.copy(text = currentElement.text + trimmedText))
                         }
 
-                        // 案例 2: 如果原始文本不等于trim后的文本，说明存在纯空格。
-                        // 这些空格应该作为一个独立的文本节点，成为父元素的子节点。
-                        // 例如 `</span> <span` 中的 " "
-                        val whitespace = rawText.replace(trimmedText, "")
-                        if (whitespace.isNotEmpty()) {
-                            // 在关闭标签后，栈顶就是父元素
-                            val textNode = XmlElement(name = "#text", text = whitespace, attributes = emptyList(), children = emptyList())
-                            val parent = stack.peek()
-                            val newChildren = parent.children.toMutableList().apply { add(textNode) }
-                            stack.pop() // pop and push to update the element with new children
-                            stack.push(parent.copy(children = newChildren))
+                        // Case 2: Handle whitespace as a separate text node child of the current top
+                        val stringBetweenTags = rawText.replace(trimmedText, "")
+                        if (stringBetweenTags.isNotEmpty()) {
+                            if (stack.isNotEmpty()) {
+                                val textNode = XmlElement(name = "#text", text = stringBetweenTags, attributes = emptyList(), children = emptyList())
+                                val parent = stack.removeLast()
+                                val newChildren = parent.children.toMutableList().apply { add(textNode) }
+                                stack.addLast(parent.copy(children = newChildren))
+                            }
                         }
                     }
                     i = nextTagIndex
@@ -101,19 +89,13 @@ internal class SimpleXmlParser {
             }
         }
 
-        return if (stack.isNotEmpty()) stack.first() else XmlElement(
-            "",
-            emptyList(),
-            emptyList(),
-            ""
-        )
+        return if (stack.isNotEmpty()) stack.first() else XmlElement("", emptyList(), emptyList(), "")
     }
 
     private fun parseTagAndAttributes(tagPart: String): Pair<String, List<XmlAttribute>> {
         val parts = tagPart.split(" ")
-        val tagName = parts[0]
+        val tagName = parts.getOrElse(0) { "" }
         val attributes = mutableListOf<XmlAttribute>()
-
         var i = 1
         while (i < parts.size) {
             val part = parts[i]
@@ -122,25 +104,23 @@ internal class SimpleXmlParser {
                 if (attrParts.size == 2) {
                     val attrName = attrParts[0]
                     var attrValue = attrParts[1]
-
-                    // 处理带引号的属性值
                     if (attrValue.startsWith("\"") && !attrValue.endsWith("\"")) {
-                        // 属性值跨越多个空格分隔的部分
                         var j = i + 1
-                        while (j < parts.size && !attrValue.endsWith("\"")) {
+                        while (j < parts.size && !parts[j].endsWith("\"")) {
                             attrValue += " " + parts[j]
                             j++
                         }
-                        i = j - 1
+                        if (j < parts.size) {
+                            attrValue += " " + parts[j]
+                        }
+                        i = j
                     }
-
                     attrValue = attrValue.removeSurrounding("\"")
                     attributes.add(XmlAttribute(attrName, attrValue))
                 }
             }
             i++
         }
-
         return tagName to attributes
     }
 }
