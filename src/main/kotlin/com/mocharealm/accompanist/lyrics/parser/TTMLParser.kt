@@ -42,7 +42,6 @@ object TTMLParser : ILyricsParser {
             if (begin != null && end != null) {
                 val currentAlignment = getAlignmentFromAgent(pElement, agentAlignments)
 
-                // 获取p元素级别的翻译（排除背景音节内部的翻译）
                 val pLevelTranslationSpan = pElement.children.find { child ->
                     child.attributes.any { it.name.endsWith(":role") && it.value == "x-translation" } &&
                             child.attributes.none { it.name.endsWith(":role") && it.value == "x-bg" }
@@ -64,7 +63,6 @@ object TTMLParser : ILyricsParser {
                     )
                 }
 
-                // 处理背景音节
                 pElement.children.forEach { child ->
                     if (child.name == "span" && child.attributes.any {
                             it.name.endsWith(":role") && it.value == "x-bg"
@@ -75,7 +73,6 @@ object TTMLParser : ILyricsParser {
 
                         val accompanimentSyllables = parseSyllablesFromChildren(child.children)
                         if (accompanimentSyllables.isNotEmpty()) {
-                            // 查找背景音节内部的翻译
                             val bgTranslationSpan = child.children.find { bgChild ->
                                 bgChild.attributes.any { it.name.endsWith(":role") && it.value == "x-translation" }
                             }
@@ -121,14 +118,11 @@ object TTMLParser : ILyricsParser {
                 if (spanBegin != null && spanEnd != null && child.text.isNotEmpty()) {
                     var syllableContent = child.text
 
-                    // Look ahead to the next sibling to see if it's a whitespace text node.
+                    // Look ahead to the next sibling to see if it's a between tags text node.
                     // This indicates a space between words (syllables).
                     val nextSibling = children.getOrNull(i + 1)
-                    if (nextSibling != null && nextSibling.name == "#text" && nextSibling.text.contains(
-                            " "
-                        )
-                    ) {
-                        syllableContent += " "
+                    if (nextSibling != null && nextSibling.name == "#text"){
+                        syllableContent += nextSibling.text
                     }
 
                     syllables.add(

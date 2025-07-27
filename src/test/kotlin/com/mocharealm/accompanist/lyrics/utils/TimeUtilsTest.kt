@@ -3,7 +3,7 @@ package com.mocharealm.accompanist.lyrics.utils
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class StringUtilsTest {
+class TimeUtilsTest {
     @Test
     fun test3DigitsMillsParse() {
         val time = "00:00.123".parseAsTime()
