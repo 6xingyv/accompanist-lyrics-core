@@ -5,7 +5,6 @@ data class KaraokeSyllable(
     val content: String,
     val start: Int,
     val end: Int,
-    val isMagnificent: Boolean = false
 ) {
     val duration = end - start
 
