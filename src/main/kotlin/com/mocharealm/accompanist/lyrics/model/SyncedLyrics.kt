@@ -47,4 +47,68 @@ data class SyncedLyrics(
             low.coerceAtMost(lines.size)
         }
     }
+
+    /**
+     * Gets the indices of all lines that should be highlighted at the given time.
+     *
+     * This is useful for scenarios with overlapping lyrics, such as duets or background vocals.
+     * The function efficiently finds all lines whose time range includes the given `time`.
+     * This implementation uses a manual binary search to ensure stability in Jetpack Compose.
+     *
+     * @param time The current time in milliseconds.
+     * @return A list of indices for all lines to be highlighted. Returns an empty list if no lines match.
+     */
+    fun getCurrentAllHighlightLineIndicesByTime(time: Int): List<Int> {
+        if (lines.isEmpty()) {
+            return emptyList()
+        }
+
+        val results = mutableListOf<Int>()
+
+        var low = 0
+        var high = lines.size - 1
+        var probeIndex = -1
+
+        while (low <= high) {
+            val mid = low + (high - low) / 2
+            val line = lines[mid]
+
+            if (line.start > time) {
+                high = mid - 1
+            } else if (line.end < time) {
+                low = mid + 1
+            } else {
+                probeIndex = mid
+                break
+            }
+        }
+
+        val searchStartIndex = if (probeIndex >= 0) {
+            probeIndex
+        } else {
+            (low - 1).coerceAtLeast(0)
+        }
+
+        for (i in searchStartIndex downTo 0) {
+            val line = lines[i]
+            if (time in line.start..line.end) {
+                results.add(i)
+            }
+            if (line.end < time) {
+                break
+            }
+        }
+
+        for (i in (searchStartIndex + 1) until lines.size) {
+            val line = lines[i]
+            if (time in line.start..line.end) {
+                results.add(i)
+            }
+            if (line.start > time) {
+                break
+            }
+        }
+
+        return results.sorted()
+    }
 }
