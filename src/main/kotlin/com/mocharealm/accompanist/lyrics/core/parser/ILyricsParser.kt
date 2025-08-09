@@ -1,6 +1,6 @@
-package com.mocharealm.accompanist.lyrics.parser
+package com.mocharealm.accompanist.lyrics.core.parser
 
-import com.mocharealm.accompanist.lyrics.model.SyncedLyrics
+import com.mocharealm.accompanist.lyrics.core.model.SyncedLyrics
 
 interface ILyricsParser {
     /**

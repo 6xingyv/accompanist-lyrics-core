@@ -1,9 +1,9 @@
-package com.mocharealm.accompanist.lyrics.exporter
+package com.mocharealm.accompanist.lyrics.core.exporter
 
-import com.mocharealm.accompanist.lyrics.model.SyncedLyrics
-import com.mocharealm.accompanist.lyrics.model.karaoke.KaraokeLine
-import com.mocharealm.accompanist.lyrics.model.synced.SyncedLine
-import com.mocharealm.accompanist.lyrics.utils.toTimeFormattedString
+import com.mocharealm.accompanist.lyrics.core.model.SyncedLyrics
+import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine
+import com.mocharealm.accompanist.lyrics.core.model.synced.SyncedLine
+import com.mocharealm.accompanist.lyrics.core.utils.toTimeFormattedString
 
 object LrcExporter : ILyricsExporter {
     override fun export(lyrics: SyncedLyrics): String {

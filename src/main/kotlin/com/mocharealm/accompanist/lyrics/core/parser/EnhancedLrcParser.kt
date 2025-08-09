@@ -1,10 +1,10 @@
-package com.mocharealm.accompanist.lyrics.parser
+package com.mocharealm.accompanist.lyrics.core.parser
 
-import com.mocharealm.accompanist.lyrics.model.SyncedLyrics
-import com.mocharealm.accompanist.lyrics.model.karaoke.KaraokeAlignment
-import com.mocharealm.accompanist.lyrics.model.karaoke.KaraokeLine
-import com.mocharealm.accompanist.lyrics.model.karaoke.KaraokeSyllable
-import com.mocharealm.accompanist.lyrics.utils.parseAsTime
+import com.mocharealm.accompanist.lyrics.core.model.SyncedLyrics
+import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeAlignment
+import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine
+import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeSyllable
+import com.mocharealm.accompanist.lyrics.core.utils.parseAsTime
 
 object EnhancedLrcParser : ILyricsParser {
     private val lineRegex = Regex("^\\[(.*?)](\\s*(.*))?$")

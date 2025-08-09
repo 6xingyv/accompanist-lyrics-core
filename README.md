@@ -1,11 +1,19 @@
-# Accompanist Lyrics
+<img src="./artwork/banner.png" style="border-radius: 6px; margin-bottom: 8px">
 
 [![Tests](https://img.shields.io/github/actions/workflow/status/Mocha-Realm/Accompanist-Lyrics/test.yml?branch=main&label=Tests)](https://github.com/Mocha-Realm/Accompanist-Lyrics/actions/workflows/test.yml)
-[![Maven Central](https://img.shields.io/maven-central/v/com.mocharealm.accompanist/accompanist-lyrics)](https://central.sonatype.com/artifact/com.mocharealm.accompanist/accompanist-lyrics)
+[![Maven Central](https://img.shields.io/maven-central/v/com.mocharealm.accompanist/lyrics-core)](https://central.sonatype.com/artifact/com.mocharealm.accompanist/lyrics-core)
 [![Telegram](https://img.shields.io/badge/Telegram-Community-blue?logo=telegram)](https://t.me/mocha_pot)
 [![License](https://img.shields.io/badge/License-Apache_2.0-green.svg)](http://www.apache.org/licenses/LICENSE-2.0.txt)
 
-A general-purpose, extensible lyrics parsing library for Kotlin/JVM.
+## 📦 Repository
+
+Accompanist released a group of artifacts, including: 
+
+- [`lyrics-core`](https://github.com/6xingyv/Accompanist-Lyrics) - Parsing lyrics file, holding data and exporting to other formats.
+
+- [`lyrics-ui`](https://github.com/6xingyv/Accompanist) - Standard lyrics interface built on Jetpack Compose
+
+This repository hosts the `lyrics-core` code.
 
 ## ✨ Features
 
@@ -29,7 +37,7 @@ Add the dependency to your `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation("com.mocharealm.accompanist:accompanist-lyrics:VERSION")
+    implementation("com.mocharealm.accompanist:lyrics-core:VERSION")
 }
 ```
 
@@ -44,7 +52,7 @@ dependencies {
 For most use cases, `AutoParser` is the easiest way to parse lyrics without needing to know the format beforehand.
 
 ```kotlin
-import com.mocharealm.accompanist.lyrics.parser.AutoParser
+import com.mocharealm.accompanist.lyrics.core.parser.AutoParser
 
 // 1. Get your lyrics content from a file or network
 val lyricsContent: String = fetchLyrics()
@@ -65,7 +73,7 @@ println(lyrics.lines.first().text)
 If you know the exact format, you can use a specific parser directly.
 
 ```kotlin
-import com.mocharealm.accompanist.lyrics.parser.LrcParser
+import com.mocharealm.accompanist.lyrics.core.parser.LrcParser
 
 val lrcLines = listOf(
     "[00:39.96]I lean in and you move away",
@@ -89,8 +97,8 @@ Accompanist Lyrics is designed to be extensible. You can add support for any cus
 Create a class that implements the parsing logic for your custom format.
 
 ```kotlin
-import com.mocharealm.accompanist.lyrics.model.SyncedLyrics
-import com.mocharealm.accompanist.lyrics.parser.ILyricsParser
+import com.mocharealm.accompanist.lyrics.core.model.SyncedLyrics
+import com.mocharealm.accompanist.lyrics.core.parser.ILyricsParser
 
 class MyCustomParser : ILyricsParser {
     override fun parse(lines: List<String>): SyncedLyrics {
@@ -108,7 +116,7 @@ class MyCustomParser : ILyricsParser {
 Create a `LyricsFormat` that contains a detector function. This function returns `true` if the given content matches your custom format.
 
 ```kotlin
-import com.mocharealm.accompanist.lyrics.utils.LyricsFormatGuesser
+import com.mocharealm.accompanist.lyrics.core.utils.LyricsFormatGuesser
 
 val myCustomFormat = LyricsFormatGuesser.LyricsFormat(
     name = "MY_CUSTOM_FORMAT",
@@ -124,7 +132,7 @@ val myCustomFormat = LyricsFormatGuesser.LyricsFormat(
 Use the `withFormat` method on the builder to register your new format and its parser. Custom formats are checked first, ensuring they are prioritized over built-in ones.
 
 ```kotlin
-import com.mocharealm.accompanist.lyrics.parser.AutoParser
+import com.mocharealm.accompanist.lyrics.core.parser.AutoParser
 
 // Build an AutoParser instance with your custom format
 val autoParser = AutoParser.Builder()

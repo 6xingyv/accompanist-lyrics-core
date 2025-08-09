@@ -1,8 +1,8 @@
-package com.mocharealm.accompanist.lyrics.parser
+package com.mocharealm.accompanist.lyrics.core.parser
 
-import com.mocharealm.accompanist.lyrics.model.SyncedLyrics
-import com.mocharealm.accompanist.lyrics.model.synced.UncheckedSyncedLine
-import com.mocharealm.accompanist.lyrics.utils.parseAsTime
+import com.mocharealm.accompanist.lyrics.core.model.SyncedLyrics
+import com.mocharealm.accompanist.lyrics.core.model.synced.UncheckedSyncedLine
+import com.mocharealm.accompanist.lyrics.core.utils.parseAsTime
 
 /**
  * A parser for LRC (LyRiCs) files.

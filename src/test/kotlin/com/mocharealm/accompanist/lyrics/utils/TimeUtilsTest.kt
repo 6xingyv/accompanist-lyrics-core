@@ -1,5 +1,6 @@
 package com.mocharealm.accompanist.lyrics.utils
 
+import com.mocharealm.accompanist.lyrics.core.utils.parseAsTime
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

@@ -1,4 +1,4 @@
-package com.mocharealm.accompanist.lyrics.utils
+package com.mocharealm.accompanist.lyrics.core.utils
 
 internal fun String.isDigitsOnly(): Boolean {
     return this.all { it.isDigit() }

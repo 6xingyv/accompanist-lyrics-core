@@ -1,6 +1,7 @@
 package com.mocharealm.accompanist.lyrics.parser
 
-import com.mocharealm.accompanist.lyrics.model.synced.SyncedLine
+import com.mocharealm.accompanist.lyrics.core.model.synced.SyncedLine
+import com.mocharealm.accompanist.lyrics.core.parser.LrcParser
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

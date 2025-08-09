@@ -1,6 +1,6 @@
-package com.mocharealm.accompanist.lyrics.parser
+package com.mocharealm.accompanist.lyrics.core.parser
 
-import com.mocharealm.accompanist.lyrics.model.Attributes
+import com.mocharealm.accompanist.lyrics.core.model.Attributes
 
 /**
  * Helper object for parsing and managing specific, known metadata from lyrics lines.

@@ -1,10 +1,10 @@
-package com.mocharealm.accompanist.lyrics.exporter
+package com.mocharealm.accompanist.lyrics.core.exporter
 
-import com.mocharealm.accompanist.lyrics.model.SyncedLyrics
-import com.mocharealm.accompanist.lyrics.model.karaoke.KaraokeAlignment
-import com.mocharealm.accompanist.lyrics.model.karaoke.KaraokeLine
-import com.mocharealm.accompanist.lyrics.model.karaoke.KaraokeSyllable
-import com.mocharealm.accompanist.lyrics.utils.toTimeFormattedString
+import com.mocharealm.accompanist.lyrics.core.model.SyncedLyrics
+import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeAlignment
+import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine
+import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeSyllable
+import com.mocharealm.accompanist.lyrics.core.utils.toTimeFormattedString
 
 object TTMLExporter : ILyricsExporter {
 

@@ -1,4 +1,4 @@
-package com.mocharealm.accompanist.lyrics.model.karaoke
+package com.mocharealm.accompanist.lyrics.core.model.karaoke
 
 
 data class KaraokeSyllable(

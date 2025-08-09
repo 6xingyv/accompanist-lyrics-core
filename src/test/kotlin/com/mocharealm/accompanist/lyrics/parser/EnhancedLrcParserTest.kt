@@ -1,7 +1,8 @@
 package com.mocharealm.accompanist.lyrics.parser
 
-import com.mocharealm.accompanist.lyrics.model.karaoke.KaraokeAlignment
-import com.mocharealm.accompanist.lyrics.model.karaoke.KaraokeLine
+import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeAlignment
+import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine
+import com.mocharealm.accompanist.lyrics.core.parser.EnhancedLrcParser
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

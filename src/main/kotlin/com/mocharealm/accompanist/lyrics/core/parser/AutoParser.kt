@@ -1,8 +1,8 @@
-package com.mocharealm.accompanist.lyrics.parser
+package com.mocharealm.accompanist.lyrics.core.parser
 
-import com.mocharealm.accompanist.lyrics.model.SyncedLyrics
-import com.mocharealm.accompanist.lyrics.model.synced.SyncedLine
-import com.mocharealm.accompanist.lyrics.utils.LyricsFormatGuesser
+import com.mocharealm.accompanist.lyrics.core.model.SyncedLyrics
+import com.mocharealm.accompanist.lyrics.core.model.synced.SyncedLine
+import com.mocharealm.accompanist.lyrics.core.utils.LyricsFormatGuesser
 
 /**
  * A smart parser that automatically detects the lyrics format and uses the appropriate parser.
@@ -49,7 +49,7 @@ class AutoParser(private val guesser: LyricsFormatGuesser) : ILyricsParser {
      * Parses lyrics from a list of strings by first guessing the format.
      *
      * @param lines The lyrics lines to parse.
-     * @return A [com.mocharealm.accompanist.lyrics.model.SyncedLyrics] object, or an empty one if the format is unknown or parsing fails.
+     * @return A [SyncedLyrics] object, or an empty one if the format is unknown or parsing fails.
      */
     override fun parse(lines: List<String>): SyncedLyrics {
         return parse(lines.joinToString("\n"))

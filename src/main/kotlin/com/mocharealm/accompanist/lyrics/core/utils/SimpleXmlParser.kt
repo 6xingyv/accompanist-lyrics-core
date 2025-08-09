@@ -1,4 +1,4 @@
-package com.mocharealm.accompanist.lyrics.utils
+package com.mocharealm.accompanist.lyrics.core.utils
 
 
 internal data class XmlAttribute(
@@ -41,7 +41,13 @@ internal class SimpleXmlParser {
                         val actualTagPart = if (isSelfClosing) tagPart.dropLast(1).trim() else tagPart
 
                         val (tagName, attributes) = parseTagAndAttributes(actualTagPart)
-                        val newElement = XmlElement(tagName, attributes, emptyList(), "")
+                        val newElement =
+                            _root_ide_package_.com.mocharealm.accompanist.lyrics.core.utils.XmlElement(
+                                tagName,
+                                attributes,
+                                emptyList(),
+                                ""
+                            )
 
                         if (isSelfClosing) {
                             if (stack.isNotEmpty()) {
@@ -77,7 +83,13 @@ internal class SimpleXmlParser {
                         val stringBetweenTags = rawText.replace(trimmedText, "")
                         if (stringBetweenTags.isNotEmpty()) {
                             if (stack.isNotEmpty()) {
-                                val textNode = XmlElement(name = "#text", text = stringBetweenTags, attributes = emptyList(), children = emptyList())
+                                val textNode =
+                                    _root_ide_package_.com.mocharealm.accompanist.lyrics.core.utils.XmlElement(
+                                        name = "#text",
+                                        text = stringBetweenTags,
+                                        attributes = emptyList(),
+                                        children = emptyList()
+                                    )
                                 val parent = stack.removeLast()
                                 val newChildren = parent.children.toMutableList().apply { add(textNode) }
                                 stack.addLast(parent.copy(children = newChildren))
@@ -89,7 +101,12 @@ internal class SimpleXmlParser {
             }
         }
 
-        return if (stack.isNotEmpty()) stack.first() else XmlElement("", emptyList(), emptyList(), "")
+        return if (stack.isNotEmpty()) stack.first() else _root_ide_package_.com.mocharealm.accompanist.lyrics.core.utils.XmlElement(
+            "",
+            emptyList(),
+            emptyList(),
+            ""
+        )
     }
 
     private fun parseTagAndAttributes(tagPart: String): Pair<String, List<XmlAttribute>> {
@@ -116,7 +133,12 @@ internal class SimpleXmlParser {
                         i = j
                     }
                     attrValue = attrValue.removeSurrounding("\"")
-                    attributes.add(XmlAttribute(attrName, attrValue))
+                    attributes.add(
+                        _root_ide_package_.com.mocharealm.accompanist.lyrics.core.utils.XmlAttribute(
+                            attrName,
+                            attrValue
+                        )
+                    )
                 }
             }
             i++

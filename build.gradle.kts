@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "com.mocharealm.accompanist"
-version = "0.2.0"
+version = "0.2.1"
 
 repositories {
     mavenCentral()
@@ -36,7 +36,7 @@ mavenPublishing {
 
     signAllPublications()
 
-    coordinates(group.toString(), "accompanist-lyrics", version.toString())
+    coordinates(group.toString(), "lyrics-core", version.toString())
 
     configure(KotlinJvm(
         // configures the -javadoc artifact, possible values:
@@ -48,10 +48,10 @@ mavenPublishing {
     ))
 
     pom {
-        name = "Accompanist Lyrics"
+        name = "Accompanist Lyrics Core"
         description = "A general lyrics library for Kotlin"
         inceptionYear = "2025"
-        url = "https://github.com/6xingyv/Accompanist-Lyrics"
+        url = "https://mocharealm.com/open-source"
         licenses {
             license {
                 name = "The Apache License, Version 2.0"

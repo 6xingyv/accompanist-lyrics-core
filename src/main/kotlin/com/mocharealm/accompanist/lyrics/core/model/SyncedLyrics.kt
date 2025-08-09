@@ -1,4 +1,4 @@
-package com.mocharealm.accompanist.lyrics.model
+package com.mocharealm.accompanist.lyrics.core.model
 
 data class SyncedLyrics(
     val lines: List<ISyncedLine>,

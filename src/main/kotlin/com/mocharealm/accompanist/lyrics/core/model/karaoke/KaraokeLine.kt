@@ -1,7 +1,7 @@
-package com.mocharealm.accompanist.lyrics.model.karaoke
+package com.mocharealm.accompanist.lyrics.core.model.karaoke
 
-import com.mocharealm.accompanist.lyrics.model.ISyncedLine
-import com.mocharealm.accompanist.lyrics.model.synced.SyncedLine
+import com.mocharealm.accompanist.lyrics.core.model.ISyncedLine
+import com.mocharealm.accompanist.lyrics.core.model.synced.SyncedLine
 
 data class KaraokeLine(
     val syllables: List<KaraokeSyllable>,
@@ -36,8 +36,14 @@ data class KaraokeLine(
 }
 
 fun SyncedLine.toKaraokeLine(): KaraokeLine {
-    return KaraokeLine(
-        syllables = listOf(KaraokeSyllable(this.content, this.start, this.end)),
+    return _root_ide_package_.com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine(
+        syllables = listOf(
+            _root_ide_package_.com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeSyllable(
+                this.content,
+                this.start,
+                this.end
+            )
+        ),
         translation = this.translation,
         isAccompaniment = false,
         alignment = KaraokeAlignment.Unspecified,
