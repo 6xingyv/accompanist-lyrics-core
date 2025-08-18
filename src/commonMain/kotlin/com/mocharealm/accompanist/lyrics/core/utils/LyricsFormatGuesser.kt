@@ -13,7 +13,7 @@ class LyricsFormatGuesser {
             _root_ide_package_.com.mocharealm.accompanist.lyrics.core.utils.LyricsFormatGuesser.LyricsFormat(
                 "TTML"
             ) {
-                it.contains("<tt.*xmlns.*=.*http://www.w3.org/ns/ttml.*>".toRegex(RegexOption.DOT_MATCHES_ALL))
+                it.contains("<tt.*xmlns.*=.*http://www.w3.org/ns/ttml.*>".toRegex(RegexOption.MULTILINE))
             })
 
         // WARNING: DO NOT CHANGE THE LRC AND ENHANCED_LRC ORDER
