@@ -42,7 +42,7 @@ jobs:
         gradle-home-cache-cleanup: true
       
     - name: Run tests
-      run: ./gradlew test --info --build-cache
+      run: ./gradlew allTests --info --build-cache
       
     - name: Publish Test Results
       uses: mikepenz/action-junit-report@v3
