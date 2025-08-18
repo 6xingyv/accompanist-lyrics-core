@@ -7,7 +7,7 @@ plugins {
 }
 
 group = "com.mocharealm.accompanist"
-version = "0.3.0"
+version = "0.3.1"
 
 repositories {
     mavenCentral()

@@ -16,8 +16,8 @@ object LrcParser : ILyricsParser {
         val lyricsLines = LrcMetadataHelper.removeAttributes(lines)
         val data = lyricsLines
             .flatMap { line -> parseLine(line) }
-            .rearrangeTime()
             .combineRawWithTranslation()
+            .rearrangeTime()
             .map { it.toSyncedLine() }
             .filter { it.content.isNotBlank() }
             .sortedBy { it.start }
