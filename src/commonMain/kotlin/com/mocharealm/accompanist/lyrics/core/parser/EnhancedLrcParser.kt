@@ -25,10 +25,6 @@ object EnhancedLrcParser : ILyricsParser {
     }
 
     private fun parseLine(string: String): KaraokeLine? {
-        /**
-         * A robust, procedural syllable parser that walks through the string
-         * instead of using unreliable complex regex matching.
-         */
         fun proceduralParseSyllables(content: String): List<KaraokeSyllable> {
             val syllables = mutableListOf<KaraokeSyllable>()
             var currentIndex = 0

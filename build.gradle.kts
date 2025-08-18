@@ -1,55 +1,72 @@
 import com.vanniktech.maven.publish.JavadocJar
-import com.vanniktech.maven.publish.KotlinJvm
+import com.vanniktech.maven.publish.KotlinMultiplatform
 
 plugins {
-    kotlin("jvm") version "2.2.10"
+    kotlin("multiplatform") version "2.2.10"
     id("com.vanniktech.maven.publish") version "0.34.0"
 }
 
 group = "com.mocharealm.accompanist"
-version = "0.2.1"
+version = "0.3.0"
 
 repositories {
     mavenCentral()
 }
 
-dependencies {
-    implementation(kotlin("stdlib"))
-    testImplementation(kotlin("test"))
-}
-
-tasks.test {
-    useJUnitPlatform()
-}
-
 kotlin {
     jvmToolchain(21)
-}
+    jvm()
 
-java {
-    withJavadocJar()
-    withSourcesJar()
+//    js(IR) {
+//        browser()
+//        nodejs()
+//    }
+
+    iosX64()
+    iosArm64()
+    iosSimulatorArm64()
+
+    sourceSets {
+        val commonMain by getting {
+            dependencies {
+                implementation(kotlin("stdlib"))
+            }
+        }
+
+        val commonTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+            }
+        }
+
+        val jvmMain by getting {
+            dependencies {
+            }
+        }
+
+        val jvmTest by getting {
+            dependencies {
+            }
+        }
+    }
 }
 
 mavenPublishing {
     publishToMavenCentral(automaticRelease = true)
-
     signAllPublications()
 
     coordinates(group.toString(), "lyrics-core", version.toString())
 
-    configure(KotlinJvm(
-        // configures the -javadoc artifact, possible values:
-        // - `JavadocJar.None()` don't publish this artifact
-        // - `JavadocJar.Empty()` publish an empty jar
-        // - `JavadocJar.Dokka("dokkaHtml")` when using Kotlin with Dokka, where `dokkaHtml` is the name of the Dokka task that should be used as input
-        javadocJar = JavadocJar.None(),
-        sourcesJar = true,
-    ))
+    configure(
+        KotlinMultiplatform(
+            javadocJar = JavadocJar.None(),
+            sourcesJar = true,
+        )
+    )
 
     pom {
         name = "Accompanist Lyrics Core"
-        description = "A general lyrics library for Kotlin"
+        description = "A general lyrics library for Kotlin Multiplatform"
         inceptionYear = "2025"
         url = "https://mocharealm.com/open-source"
         licenses {

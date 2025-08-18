@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="lyrics-core-js-0.2.2">
+    <output-path>$PROJECT_DIR$/build/libs</output-path>
+    <root id="archive" name="lyrics-core-js-0.2.2.jar">
+      <element id="module-output" name="lyrics-core.jsMain" />
+    </root>
+  </artifact>
+</component>

@@ -25,9 +25,15 @@ class LyricsFormatGuesser {
             _root_ide_package_.com.mocharealm.accompanist.lyrics.core.utils.LyricsFormatGuesser.LyricsFormat(
                 "ENHANCED_LRC"
             ) {
+                val hasVoiceTag = it.contains("\\]v[12]:".toRegex())
+
+                // 检查是否同时有行级和内联时间戳
                 val hasLineTimestamp = it.contains("\\[\\d{2}:\\d{2}\\.\\d{2,3}]".toRegex())
                 val hasInlineTimestamp = it.contains("<\\d{2}:\\d{2}\\.\\d{2,3}>".toRegex())
-                hasLineTimestamp && hasInlineTimestamp
+                val hasBothTimestamps = hasLineTimestamp && hasInlineTimestamp
+
+                // 满足任一条件即认为是Enhanced LRC
+                hasVoiceTag || hasBothTimestamps
             })
 
         registerFormat(

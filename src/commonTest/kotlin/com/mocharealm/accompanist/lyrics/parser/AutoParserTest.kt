@@ -3,6 +3,7 @@ package com.mocharealm.accompanist.lyrics.parser
 import com.mocharealm.accompanist.lyrics.core.model.SyncedLyrics
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeAlignment
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine
+import com.mocharealm.accompanist.lyrics.core.model.synced.SyncedLine
 import com.mocharealm.accompanist.lyrics.core.parser.AutoParser
 import com.mocharealm.accompanist.lyrics.core.parser.ILyricsParser
 import com.mocharealm.accompanist.lyrics.core.utils.LyricsFormatGuesser
@@ -24,6 +25,9 @@ class AutoParserTest {
             [00:31.38]Sometimes I still wake up thinking you're by my side
         """.trimIndent()
         val result = AutoParser.Builder().build().parse(lrc)
+        assertTrue {
+            result.lines.isNotEmpty() && result.lines.all { it is SyncedLine }
+        }
         assertEquals(2, result.lines.size)
     }
 
@@ -118,7 +122,7 @@ class AutoParserTest {
         }).build()
 
         // 3. Test parsing with the custom format
-        val customLyrics = "CUSTOM_LYRICS: This is a test."
+        val customLyrics = "CUSTOM_LYRICS: This is a commonTest."
         val result = parser.parse(customLyrics)
 
         assertEquals(1, result.lines.size)
