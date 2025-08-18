@@ -10,7 +10,7 @@ class LyricsFormatGuesser {
 
     init {
         registerFormat(
-            _root_ide_package_.com.mocharealm.accompanist.lyrics.core.utils.LyricsFormatGuesser.LyricsFormat(
+            LyricsFormat(
                 "TTML"
             ) {
                 it.contains("<tt.*xmlns.*=.*http://www.w3.org/ns/ttml.*>".toRegex(RegexOption.MULTILINE))
@@ -18,7 +18,7 @@ class LyricsFormatGuesser {
 
         // WARNING: DO NOT CHANGE THE LRC AND ENHANCED_LRC ORDER
         registerFormat(
-            _root_ide_package_.com.mocharealm.accompanist.lyrics.core.utils.LyricsFormatGuesser.LyricsFormat(
+            LyricsFormat(
                 "LRC"
             ) { it.contains("\\[\\d{2}:\\d{2}\\.\\d{2,3}].+".toRegex()) })
         registerFormat(
@@ -37,7 +37,7 @@ class LyricsFormatGuesser {
             })
 
         registerFormat(
-            _root_ide_package_.com.mocharealm.accompanist.lyrics.core.utils.LyricsFormatGuesser.LyricsFormat(
+            LyricsFormat(
                 "LYRICIFY_SYLLABLE"
             ) { it.contains("[a-zA-Z]+\\s*\\(\\d+,\\d+\\)".toRegex()) })
     }
