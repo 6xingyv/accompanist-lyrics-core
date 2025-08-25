@@ -93,20 +93,22 @@ class KugouKrcParser(
     private fun detectRoleAndAlignment(sylls: List<KaraokeSyllable>): Pair<KaraokeAlignment, List<KaraokeSyllable>> {
         if (sylls.isEmpty()) return KaraokeAlignment.Unspecified to sylls
 
-        val first = sylls.first().content
-        if (first.endsWith("：") && first.length > 1) {
-            // 触发切换逻辑
-            val alignment = currentToggle
-            // 下一次切换
+        // 把整行拼起来
+        val lineContent = sylls.joinToString(separator = "") { it.content }
+
+        // 判断行首是否有角色标识
+        if (lineContent.length > 1 && (lineContent.startsWith("：") || lineContent.startsWith(":") ||
+                    lineContent.endsWith("：") || lineContent.endsWith(":"))) {
+            // 切换逻辑
             currentToggle = if (currentToggle == KaraokeAlignment.Start) {
                 KaraokeAlignment.End
             } else {
                 KaraokeAlignment.Start
             }
-            return alignment to sylls
+            return currentToggle to sylls
         }
 
-        return KaraokeAlignment.Unspecified to sylls
+        return currentToggle to sylls
     }
 
     private fun parseSyllablesWithRoleMerge(content: String, lineStart: Int): List<KaraokeSyllable> {
