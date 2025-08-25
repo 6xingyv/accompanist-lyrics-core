@@ -12,8 +12,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
-class KugouKrcParser(
-) : ILyricsParser {
+object KugouKrcParser : ILyricsParser {
     private val krcLineRegex = Regex("""^\[(\d+),(\d+)](.*)$""")
     private val syllableRegex = Regex("""<(\d+),(\d+),\d+>""")
     private val bgLineRegex = Regex("""^\[bg:(.*)](.*)$""")

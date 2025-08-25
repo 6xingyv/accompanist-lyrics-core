@@ -40,6 +40,11 @@ class LyricsFormatGuesser {
             LyricsFormat(
                 "LYRICIFY_SYLLABLE"
             ) { it.contains("[a-zA-Z]+\\s*\\(\\d+,\\d+\\)".toRegex()) })
+
+        registerFormat(
+            LyricsFormat(
+                "KUGOU_KRC"
+            ) { it.contains("""^\[\d+,\d+]""".toRegex()) && it.contains("""<\d+,\d+,\d+>.{1}""".toRegex()) })
     }
 
     /**

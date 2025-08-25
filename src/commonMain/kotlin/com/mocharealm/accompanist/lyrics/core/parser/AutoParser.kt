@@ -20,6 +20,7 @@ class AutoParser(private val guesser: LyricsFormatGuesser) : ILyricsParser {
         registerParser("ENHANCED_LRC", EnhancedLrcParser)
         registerParser("TTML", TTMLParser)
         registerParser("LYRICIFY_SYLLABLE", LyricifySyllableParser)
+        registerParser("KUGOU_KRC", KugouKrcParser)
     }
 
     /**
