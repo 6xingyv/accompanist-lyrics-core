@@ -3,6 +3,7 @@ import com.vanniktech.maven.publish.KotlinMultiplatform
 
 plugins {
     kotlin("multiplatform") version "2.2.10"
+    kotlin("plugin.serialization") version "2.2.10"
     id("com.vanniktech.maven.publish") version "0.34.0"
 }
 
@@ -30,6 +31,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 implementation(kotlin("stdlib"))
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
             }
         }
 
