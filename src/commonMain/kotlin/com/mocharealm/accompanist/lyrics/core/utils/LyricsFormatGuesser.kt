@@ -44,7 +44,15 @@ class LyricsFormatGuesser {
         registerFormat(
             LyricsFormat(
                 "KUGOU_KRC"
-            ) { it.contains("""^\[\d+,\d+]""".toRegex()) && it.contains("""<\d+,\d+,\d+>.{1}""".toRegex()) })
+            ) { val lines = it.lines().map { it.trim() }.filter { it.isNotEmpty() }
+                // 行时间戳正则 [0,3946]
+                val lineTimeRegex = """^\[\d+,\d+]""".toRegex()
+                // 字时间戳正则 <0,171,0>字
+                val wordTimeRegex = """<\d+,\d+,\d+>.{1}""".toRegex()
+                // 确定符合格式
+                lines.any { line ->
+                    lineTimeRegex.containsMatchIn(line) && wordTimeRegex.containsMatchIn(line)
+                } })
     }
 
     /**

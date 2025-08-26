@@ -9,8 +9,8 @@ import kotlin.test.assertEquals
 class KugouParserTest {
     @Test
     fun testParseKugouKrcWithoutTranslation() {
-        val krc ="""
-[id:${'$'}00000000]
+        val krc = """
+[id:$00000000]
 [ar:三Z-STUDIO/HOYO-MiX]
 [ti:覆灭重生 Come Alive]
 [by:]
@@ -123,7 +123,7 @@ class KugouParserTest {
 [237242,3001]<0,209,0>We're <209,327,0>gonna <536,352,0>make <888,361,0>it <1249,448,0>out <1697,400,0>my <2097,592,0>friend
         """.trimIndent().split("\n")
         val result = KugouKrcParser.parse(krc)
-        // 验证解析出的行数 (99行主歌词和翻译)
+        // 验证解析出的行数 (100行主歌词和翻译)
         assertEquals(100, result.lines.size)
 
         // 行按时间排序
@@ -246,7 +246,7 @@ class KugouParserTest {
         """.trimIndent()
 
         val result = KugouKrcParser.parse(krc)
-        // 验证解析出的行数 (83行主歌词)
+        // 验证解析出的行数 (84行主歌词)
         assertEquals(84, result.lines.size)
 
         val shiWuLine = result.lines[14] as KaraokeLine
