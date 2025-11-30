@@ -26,6 +26,16 @@ object TTMLParser : ILyricsParser {
             .replace(" </span><span", "</span> <span")
             .replace(",</span><span", ",</span> <span")
 
+    private fun decodeXmlEntities(text: String): String {
+        return text
+            .replace("&amp;", "&")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&apos;", "'")
+            .replace("&quot;", "\"")
+    }
+
+
     override fun parse(content: String): SyncedLyrics {
         val content = preformattingTTML(content)
         val parsedLines = mutableListOf<KaraokeLine>()
@@ -109,7 +119,6 @@ object TTMLParser : ILyricsParser {
         for (i in children.indices) {
             val child = children[i]
 
-            // We only care about <span> elements that are not for translation or background roles at this level.
             if (child.name == "span" && child.attributes.none {
                     it.name.endsWith(":role") && (it.value == "x-translation" || it.value == "x-bg")
                 }) {
@@ -117,13 +126,12 @@ object TTMLParser : ILyricsParser {
                 val spanEnd = child.attributes.find { it.name == "end" }?.value
 
                 if (spanBegin != null && spanEnd != null && child.text.isNotEmpty()) {
-                    var syllableContent = child.text
 
-                    // Look ahead to the next sibling to see if it's a between tags text node.
-                    // This indicates a space between words (syllables).
+                    var syllableContent = decodeXmlEntities(child.text)
+
                     val nextSibling = children.getOrNull(i + 1)
-                    if (nextSibling != null && nextSibling.name == "#text"){
-                        syllableContent += nextSibling.text
+                    if (nextSibling != null && nextSibling.name == "#text") {
+                        syllableContent += decodeXmlEntities(nextSibling.text)
                     }
 
                     syllables.add(
@@ -137,11 +145,10 @@ object TTMLParser : ILyricsParser {
             }
         }
 
-        // Trim the trailing space from the very last syllable of the line.
         if (syllables.isNotEmpty()) {
-            val lastSyllable = syllables.last()
+            val last = syllables.last()
             syllables[syllables.lastIndex] =
-                lastSyllable.copy(content = lastSyllable.content.trimEnd())
+                last.copy(content = last.content.trimEnd())
         }
 
         return syllables
