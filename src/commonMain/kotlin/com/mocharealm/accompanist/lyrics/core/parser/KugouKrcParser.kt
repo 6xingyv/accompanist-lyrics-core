@@ -4,79 +4,8 @@ import com.mocharealm.accompanist.lyrics.core.model.SyncedLyrics
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeAlignment
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeSyllable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
+import com.mocharealm.accompanist.lyrics.core.utils.KugouKrcMetadataDecoder
 
-object KrcMetadataDecoder {
-
-    data class MetaData(
-        val translations: List<String> = emptyList(),
-        val phonetics: List<List<String>> = emptyList()
-    )
-
-    @OptIn(ExperimentalEncodingApi::class)
-    fun decode(languageHeader: String?): MetaData {
-        if (languageHeader.isNullOrBlank()) return MetaData()
-
-        val contentBase64 = languageHeader
-            .substringAfter("[language:")
-            .substringBeforeLast("]")
-            .trim()
-
-        if (contentBase64.isEmpty()) return MetaData()
-
-        return try {
-            val decodedBytes = Base64.decode(contentBase64)
-            val jsonStr = decodedBytes.decodeToString()
-            parseJsonContent(jsonStr)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            MetaData()
-        }
-    }
-
-    private fun parseJsonContent(jsonStr: String): MetaData {
-        val root = Json.parseToJsonElement(jsonStr).jsonObject
-        val contentArray = root["content"]?.jsonArray ?: return MetaData()
-
-        val lyricLines = mutableListOf<String>()
-        val pronLines = mutableListOf<List<String>>()
-
-        for (element in contentArray) {
-            val jsonObj = element.jsonObject
-            val type = jsonObj["type"]?.jsonPrimitive?.intOrNull
-
-            if (type == 0) {
-                // 解析注音
-                val rawArr = jsonObj["lyricContent"]?.jsonArray
-                if (rawArr != null) {
-                    val lineProns = rawArr.map { syllableNode ->
-                        syllableNode.jsonArray.joinToString("") { it.jsonPrimitive.content }
-                    }
-                    pronLines.add(lineProns)
-                }
-            } else if (type == 1) {
-                val rawArr = jsonObj["lyricContent"]?.jsonArray
-                if (rawArr != null) {
-                    val lineTrans = rawArr.map { syllableNode ->
-                        syllableNode.jsonArray.joinToString("") { it.jsonPrimitive.content }
-                    }
-                    lyricLines.add(lineTrans.joinToString(""))
-                }
-            }
-        }
-
-        return MetaData(
-            translations = lyricLines,
-            phonetics = pronLines
-        )
-    }
-}
 
 object KugouKrcParser : ILyricsParser {
     private val KRC_LINE_REGEX = Regex("""^\[(\d+),(\d+)](.*)$""")
@@ -91,7 +20,7 @@ object KugouKrcParser : ILyricsParser {
         val rawLines = rawLinesSequence.toList()
 
         val languageLine = rawLines.firstOrNull { it.trim().startsWith(LANGUAGE_TAG_START) }
-        val metaData = KrcMetadataDecoder.decode(languageLine)
+        val metaData = KugouKrcMetadataDecoder.decode(languageLine)
 
         val resultLines = mutableListOf<KaraokeLine>()
 

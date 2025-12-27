@@ -1,4 +1,4 @@
-package com.mocharealm.accompanist.lyrics.core.parser
+package com.mocharealm.accompanist.lyrics.core.utils
 
 import com.mocharealm.accompanist.lyrics.core.model.Attributes
 
@@ -20,7 +20,7 @@ object LrcMetadataHelper {
      * Parses a list of lines to extract values for the known metadata tags.
      *
      * @param lines The list of strings from the lyrics file.
-     * @return An [Attributes] object containing the parsed metadata.
+     * @return An [com.mocharealm.accompanist.lyrics.core.model.Attributes] object containing the parsed metadata.
      */
     fun parse(lines: List<String>): Attributes {
         val attributesMap = lines.mapNotNull { line ->
