@@ -6,7 +6,6 @@ import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeSyllable
 import com.mocharealm.accompanist.lyrics.core.utils.KugouKrcMetadataDecoder
 
-
 object KugouKrcParser : ILyricsParser {
     private val KRC_LINE_REGEX = Regex("""^\[(\d+),(\d+)](.*)$""")
     private val SYLLABLE_REGEX = Regex("""<(\d+),(\d+),\d+>""")
@@ -20,7 +19,7 @@ object KugouKrcParser : ILyricsParser {
         val rawLines = rawLinesSequence.toList()
 
         val languageLine = rawLines.firstOrNull { it.trim().startsWith(LANGUAGE_TAG_START) }
-        val metaData = KugouKrcMetadataDecoder.decode(languageLine)
+        val metadata = KugouKrcMetadataDecoder.decode(languageLine)
 
         val resultLines = mutableListOf<KaraokeLine>()
 
@@ -48,12 +47,12 @@ object KugouKrcParser : ILyricsParser {
             val contentPart = match.groupValues[3]
             val rawSyllables = parseSyllablesAndMergeColons(contentPart, lineStart)
 
-            val syllablesWithPhonetics = injectPhonetics(rawSyllables, metaData.phonetics, lyricLineIndex)
+            val syllablesWithPhonetics = injectPhonetics(rawSyllables, metadata.phonetics, lyricLineIndex)
 
             val (alignment, finalSyllables, nextState) = determineRole(syllablesWithPhonetics, currentRoleState)
             currentRoleState = nextState
 
-            val translation = metaData.translations.getOrNull(lyricLineIndex)
+            val translation = metadata.translations.getOrNull(lyricLineIndex)?.takeIf { it.isNotBlank() }
 
             if (finalSyllables.isNotEmpty()) {
                 resultLines.add(

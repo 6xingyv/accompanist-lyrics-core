@@ -36,39 +36,44 @@ object KugouKrcMetadataDecoder {
     }
 
     private fun parseJsonContent(jsonStr: String): Metadata {
-        val root = Json.parseToJsonElement(jsonStr).jsonObject
-        val contentArray = root["content"]?.jsonArray ?: return Metadata()
+        try {
+            val root = Json.parseToJsonElement(jsonStr).jsonObject
+            val contentArray = root["content"]?.jsonArray ?: return Metadata()
 
-        val lyricLines = mutableListOf<String>()
-        val pronLines = mutableListOf<List<String>>()
+            val lyricLines = mutableListOf<String>()
+            val pronLines = mutableListOf<List<String>>()
 
-        for (element in contentArray) {
-            val jsonObj = element.jsonObject
-            val type = jsonObj["type"]?.jsonPrimitive?.intOrNull
+            for (element in contentArray) {
+                val jsonObj = element.jsonObject
+                val type = jsonObj["type"]?.jsonPrimitive?.intOrNull
 
-            if (type == 0) {
-                // 解析注音
-                val rawArr = jsonObj["lyricContent"]?.jsonArray
-                if (rawArr != null) {
-                    val lineProns = rawArr.map { syllableNode ->
-                        syllableNode.jsonArray.joinToString("") { it.jsonPrimitive.content }
+                if (type == 1) {
+                    val allRows = jsonObj["lyricContent"]?.jsonArray ?: continue
+                    for (row in allRows) {
+                        val fullLineTrans = row.jsonArray.joinToString("") { part ->
+                            part.jsonPrimitive.content
+                        }
+                        lyricLines.add(fullLineTrans)
                     }
-                    pronLines.add(lineProns)
                 }
-            } else if (type == 1) {
-                val rawArr = jsonObj["lyricContent"]?.jsonArray
-                if (rawArr != null) {
-                    val lineTrans = rawArr.map { syllableNode ->
-                        syllableNode.jsonArray.joinToString("") { it.jsonPrimitive.content }
+                else if (type == 0) {
+                    val allRows = jsonObj["lyricContent"]?.jsonArray ?: continue
+                    for (row in allRows) {
+                        val rowSyllables = row.jsonArray.map { syllableParts ->
+                            syllableParts.jsonArray.joinToString("") { it.jsonPrimitive.content }
+                        }
+                        pronLines.add(rowSyllables)
                     }
-                    lyricLines.add(lineTrans.joinToString(""))
                 }
             }
-        }
 
-        return Metadata(
-            translations = lyricLines,
-            phonetics = pronLines
-        )
+            return Metadata(
+                translations = lyricLines,
+                phonetics = pronLines
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return Metadata()
+        }
     }
 }
