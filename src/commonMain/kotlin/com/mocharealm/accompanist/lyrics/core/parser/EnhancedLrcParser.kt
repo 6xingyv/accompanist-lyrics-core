@@ -7,10 +7,35 @@ import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeSyllable
 import com.mocharealm.accompanist.lyrics.core.utils.LrcMetadataHelper
 import com.mocharealm.accompanist.lyrics.core.utils.parseAsTime
 
+/**
+ * A parser for Enhanced LRC files.
+ *
+ * Enhanced LRC extends the standard LRC format with support for syllable-level timing (Karaoke),
+ * multiple singers/voices, and background vocals.
+ *
+ * Example format:
+ * ```
+ * [00:12.34]<00:12.34>Hel<00:12.60>lo <00:12.90>World
+ * [bg:00:12.34]<00:12.34>Back<00:12.60>ground
+ * ```
+ */
 object EnhancedLrcParser : ILyricsParser {
     private val lineRegex = Regex("^\\[(.*?)](\\s*(.*))?$")
     private val timeRegex = Regex("^\\d{1,2}:\\d{1,2}\\.\\d{1,3}$")
     private val voiceParser = Regex("^(v\\d+)\\s*:\\s*(.*)")
+
+    /**
+     * Parses a list of strings into [SyncedLyrics] using the Enhanced LRC format.
+     *
+     * This format supports:
+     * - **Syllable-level timing**: using `<timestamp>` tags within the lyrics.
+     * - **Background vocals**: lines starting with `[bg:...]`.
+     * - **Multiple voices**: lines with prefixes like `v1:` or `v2:`.
+     * - **Accompaniment alignment**: handling of alignment tags for duet/chorus sections.
+     *
+     * @param lines The list of strings to parse.
+     * @return The parsed [SyncedLyrics] object containing [KaraokeLine]s.
+     */
 
     override fun parse(lines: List<String>): SyncedLyrics {
         // FIX: Removed the call to AttributesHelper.removeAttributes(lines)

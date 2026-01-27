@@ -19,7 +19,7 @@ object TTMLParser : ILyricsParser {
         return parse(lines.joinToString("") { it.trimIndent() })
     }
 
-    // Fucking AMLL and other getter not obeying the rules
+    // Workaround for AMLL and other tools not strictly following the spec
     private fun preformattingTTML(content: String): String =
         content
             .replace("  ","")
@@ -80,7 +80,7 @@ object TTMLParser : ILyricsParser {
                         KaraokeLine(
                             syllables = syllables,
                             translation = pLevelTranslationSpan?.text?.trim()
-                                ?: iTunesTranslationPair?.first, // 主歌词取括号外
+                                ?: iTunesTranslationPair?.first, // Main lyrics from outside brackets
                             isAccompaniment = false,
                             alignment = currentAlignment,
                             start = begin.parseAsTime(),
@@ -111,8 +111,8 @@ object TTMLParser : ILyricsParser {
                                 KaraokeLine(
                                     syllables = accompanimentSyllables,
                                     translation = bgTranslationSpan?.text?.trim()
-                                        ?: bgITunesTranslationPair?.second // 和声取括号内
-                                        ?: bgITunesTranslationPair?.first, // 如果括号内没有则回退括号外
+                                        ?: bgITunesTranslationPair?.second // Backing vocals from inside brackets
+                                        ?: bgITunesTranslationPair?.first, // Fallback to outside if inside is empty
                                     isAccompaniment = true,
                                     alignment = currentAlignment,
                                     start = bgSpanBegin?.parseAsTime()

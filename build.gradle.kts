@@ -3,22 +3,19 @@ import com.vanniktech.maven.publish.KotlinMultiplatform
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
-    kotlin("multiplatform") version "2.2.21"
-    kotlin("plugin.serialization") version "2.2.21"
-    id("com.vanniktech.maven.publish") version "0.34.0"
+    val kotlinVersion = "2.3.0"
+    kotlin("multiplatform") version kotlinVersion
+    kotlin("plugin.serialization") version kotlinVersion
+    id("com.vanniktech.maven.publish") version "0.35.0"
+    id("org.jetbrains.dokka") version "2.1.0"
 }
 
 group = "com.mocharealm.accompanist"
-version = "0.4.2"
-
-repositories {
-    mavenCentral()
-}
+version = "0.4.3"
 
 kotlin {
     jvmToolchain(21)
     jvm()
-
     js(IR) {
         browser {
             testTask {
@@ -46,7 +43,7 @@ kotlin {
         commonMain {
             dependencies {
                 implementation(kotlin("stdlib"))
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
             }
         }
 
@@ -58,16 +55,25 @@ kotlin {
     }
 }
 
+publishing {
+    repositories {
+        maven {
+            name = "local"
+            url = uri("file:///E:/maven")
+        }
+    }
+}
+
 mavenPublishing {
     publishToMavenCentral(automaticRelease = true)
     signAllPublications()
 
     coordinates(group.toString(), "lyrics-core", version.toString())
 
-    configure(
+configure(
         KotlinMultiplatform(
-            javadocJar = JavadocJar.Empty(),
-            sourcesJar = true,
+            javadocJar = JavadocJar.Dokka("dokkaGeneratePublicationHtml"),
+            sourcesJar = true
         )
     )
 

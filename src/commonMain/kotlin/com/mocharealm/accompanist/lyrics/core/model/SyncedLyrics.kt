@@ -59,53 +59,29 @@ data class SyncedLyrics(
      * @return A list of indices for all lines to be highlighted. Returns an empty list if no lines match.
      */
     fun getCurrentAllHighlightLineIndicesByTime(time: Int): List<Int> {
-        if (lines.isEmpty()) {
-            return emptyList()
-        }
+        if (lines.isEmpty()) return emptyList()
 
         val results = mutableListOf<Int>()
 
         var low = 0
         var high = lines.size - 1
-        var probeIndex = -1
+        var firstAfterIndex = lines.size
 
         while (low <= high) {
             val mid = low + (high - low) / 2
-            val line = lines[mid]
-
-            if (line.start > time) {
+            if (lines[mid].start > time) {
+                firstAfterIndex = mid
                 high = mid - 1
-            } else if (line.end < time) {
-                low = mid + 1
             } else {
-                probeIndex = mid
-                break
+                low = mid + 1
             }
         }
 
-        val searchStartIndex = if (probeIndex >= 0) {
-            probeIndex
-        } else {
-            (low - 1).coerceAtLeast(0)
-        }
-
-        for (i in searchStartIndex downTo 0) {
+        for (i in (firstAfterIndex - 1) downTo 0) {
             val line = lines[i]
+
             if (time in line.start..line.end) {
                 results.add(i)
-            }
-            if (line.end < time) {
-                break
-            }
-        }
-
-        for (i in (searchStartIndex + 1) until lines.size) {
-            val line = lines[i]
-            if (time in line.start..line.end) {
-                results.add(i)
-            }
-            if (line.start > time) {
-                break
             }
         }
 

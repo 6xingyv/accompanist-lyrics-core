@@ -22,7 +22,7 @@ interface ILyricsParser {
      * @return The parsed SyncedLyrics.
      */
     fun parse(content: String): SyncedLyrics {
-        // 默认实现：将 String 按行分割成 List<String>，然后调用另一个 parse 方法。
+        // Default implementation: split String by newline into List<String>, then call the other parse method.
         return parse(content.split('\n'))
     }
 }
