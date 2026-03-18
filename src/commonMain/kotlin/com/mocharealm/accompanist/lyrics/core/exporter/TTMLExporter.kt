@@ -53,7 +53,9 @@ object TTMLExporter : ILyricsExporter {
         builder.appendLine("""    <div begin="${firstLineTime.toTimeFormattedString()}" end="${totalDuration.toTimeFormattedString()}">""")
 
         lyrics.lines.filterIsInstance<KaraokeLine>().forEach { line ->
-            appendPElement(builder, line)
+            if (line is KaraokeLine.MainKaraokeLine) {
+                appendPElement(builder, line)
+            }
         }
 
         builder.appendLine("    </div>")
@@ -63,7 +65,7 @@ object TTMLExporter : ILyricsExporter {
         return builder.toString()
     }
 
-    private fun appendPElement(builder: StringBuilder, line: KaraokeLine) {
+    private fun appendPElement(builder: StringBuilder, line: KaraokeLine.MainKaraokeLine) {
         val agent = when (line.alignment) {
             KaraokeAlignment.Start -> """ ttm:agent="v1""""
             KaraokeAlignment.End -> """ ttm:agent="v2""""
@@ -91,13 +93,14 @@ object TTMLExporter : ILyricsExporter {
             }
         }
 
-        if (line.isAccompaniment) {
-            builder.append("""<span ttm:role="x-bg" begin="${line.start.toTimeFormattedString()}" end="${line.end.toTimeFormattedString()}">""")
-            buildContent(line.syllables, line.translation)
+        buildContent(line.syllables, line.translation)
+        
+        line.accompanimentLines?.forEach { bgLine ->
+            builder.append("""<span ttm:role="x-bg" begin="${bgLine.start.toTimeFormattedString()}" end="${bgLine.end.toTimeFormattedString()}">""")
+            buildContent(bgLine.syllables, bgLine.translation)
             builder.append("""</span>""")
-        } else {
-            buildContent(line.syllables, line.translation)
         }
+        
         builder.appendLine("</p>")
     }
 }

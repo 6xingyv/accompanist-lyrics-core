@@ -24,20 +24,11 @@ data class UncheckedSyncedLine(
     override val duration = (end - start).takeIf { it >= 0 } ?: 0
 
     fun toSyncedLine():SyncedLine {
-        return _root_ide_package_.com.mocharealm.accompanist.lyrics.core.model.synced.SyncedLine(
+        return SyncedLine(
             this.content,
             this.translation,
             this.start,
             this.end
         )
     }
-}
-
-fun KaraokeLine.toSyncedLine(): SyncedLine {
-    return _root_ide_package_.com.mocharealm.accompanist.lyrics.core.model.synced.SyncedLine(
-        content = this.syllables.joinToString("") { it.content }.trim(),
-        translation = this.translation,
-        start = this.start,
-        end = this.end
-    )
 }

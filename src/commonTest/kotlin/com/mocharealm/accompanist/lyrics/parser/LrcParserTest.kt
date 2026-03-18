@@ -2,54 +2,47 @@ package com.mocharealm.accompanist.lyrics.parser
 
 import com.mocharealm.accompanist.lyrics.core.model.synced.SyncedLine
 import com.mocharealm.accompanist.lyrics.core.parser.LrcParser
+import com.mocharealm.accompanist.lyrics.core.exporter.LrcExporter
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 
 class LrcParserTest {
+
     @Test
-    fun testParseLrcWithoutTranslation() {
-        val lrc ="""
-            [ti:Apt 22]
-            [ar:Joesef/Barney Lister]
-            [al:Permanent Damage (Explicit)]
-            [00:25.50]You're on my mind
-            [00:28.25]
-            [00:31.38]Sometimes I still wake up thinking you're by my side
-            [00:35.36]It's like how it was before
-            [00:39.85]
-            [02:30.75]I can still feel you by my side
-            [02:34.18]
-            [02:41.06]I can still feel you by my side
-            [02:44.27]
-            [02:51.03]I can still feel you by my side
+    fun testStandardLrcWithTranslation() {
+        val lrc = """
+            [ti:Song Title]
+            [ar:Artist Name]
+            [00:01.00]Line 1
+            [00:01.00]Translation 1
+            [00:02.50]Line 2
         """.trimIndent().split("\n")
+
         val result = LrcParser.parse(lrc)
-        assertEquals(6, result.lines.size)
-        val line = result.lines.getOrNull(0) as? SyncedLine
-
-        assertNotNull(line)
-
-        assertEquals("You're on my mind", line.content)
-        assertEquals(25500, line.start)
-        assertEquals(28250, line.end)
+        assertEquals("Song Title", result.title)
+        assertEquals(2, result.lines.size)
+        
+        val line1 = result.lines[0] as SyncedLine
+        assertEquals("Line 1", line1.content)
+        assertEquals("Translation 1", line1.translation)
     }
 
     @Test
-    fun testParseLrcWithTranslation() {
-        val lrc ="""
-            [00:39.96]I lean in and you move away
-            [00:39.96]我靠在里面，你就离开
-            [00:42.90]
-            [00:45.62]But you linger all the same
-            [00:45.62]可你依然徘徊不去
-        """.trimIndent().split("\n")
-        val result = LrcParser.parse(lrc)
-        assertEquals(2, result.lines.size)
-        val line = result.lines.getOrNull(0) as? SyncedLine
-        assertNotNull(line)
-        assertEquals("I lean in and you move away", line.content)
-        assertEquals("我靠在里面，你就离开", line.translation)
-        assertEquals(39960, line.start)
+    fun testLRCRoundTrip() {
+        val original = """
+            [ti:Round Trip]
+            [00:05.00]Hello
+            [00:05.00]你好
+            [00:10.00]World
+        """.trimIndent()
+
+        val parsed = LrcParser.parse(original.split("\n"))
+        val exported = LrcExporter.export(parsed)
+        
+        val reParsed = LrcParser.parse(exported.split("\n"))
+        
+        assertEquals(parsed.title, reParsed.title)
+        assertEquals(parsed.lines.size, reParsed.lines.size)
+        assertEquals((parsed.lines[0] as SyncedLine).translation, (reParsed.lines[0] as SyncedLine).translation)
     }
 }

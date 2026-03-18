@@ -32,7 +32,20 @@ object KugouKrcParser : ILyricsParser {
             if (line.isEmpty() || line.startsWith(LANGUAGE_TAG_START)) continue
 
             if (line.startsWith("[bg:")) {
-                parseBackgroundLine(line)?.let { resultLines.add(it) }
+                parseBackgroundLine(line)?.let { bgLine ->
+                    if (resultLines.isNotEmpty()) {
+                        val last = resultLines.last()
+                        if (last is KaraokeLine.MainKaraokeLine) {
+                            resultLines[resultLines.size - 1] = last.copy(
+                                accompanimentLines = (last.accompanimentLines ?: emptyList()) + bgLine
+                            )
+                        } else {
+                            resultLines.add(bgLine)
+                        }
+                    } else {
+                        resultLines.add(bgLine)
+                    }
+                }
                 continue
             }
 
@@ -56,10 +69,9 @@ object KugouKrcParser : ILyricsParser {
 
             if (finalSyllables.isNotEmpty()) {
                 resultLines.add(
-                    KaraokeLine(
+                    KaraokeLine.MainKaraokeLine(
                         syllables = finalSyllables,
                         translation = translation,
-                        isAccompaniment = false,
                         alignment = alignment,
                         start = finalSyllables.first().start,
                         end = finalSyllables.last().end
@@ -72,16 +84,15 @@ object KugouKrcParser : ILyricsParser {
         return SyncedLyrics(resultLines)
     }
 
-    private fun parseBackgroundLine(line: String): KaraokeLine? {
+    private fun parseBackgroundLine(line: String): KaraokeLine.AccompanimentKaraokeLine? {
         val m = BG_LINE_REGEX.find(line) ?: return null
         val content = m.groupValues[1]
         val syllables = parseSyllablesAndMergeColons(content, 0)
         if (syllables.isEmpty()) return null
 
-        return KaraokeLine(
+        return KaraokeLine.AccompanimentKaraokeLine(
             syllables = syllables,
             translation = null,
-            isAccompaniment = true,
             alignment = KaraokeAlignment.Unspecified,
             start = syllables.first().start,
             end = syllables.last().end

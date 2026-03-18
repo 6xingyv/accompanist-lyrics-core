@@ -27,6 +27,7 @@ object TTMLParser : ILyricsParser {
             .replace(",</span><span", ",</span> <span")
 
     private fun decodeXmlEntities(text: String): String {
+        if (!text.contains('&')) return text
         return text
             .replace("&amp;", "&")
             .replace("&lt;", "<")
@@ -36,94 +37,141 @@ object TTMLParser : ILyricsParser {
     }
 
     private fun splitTranslationByBracket(text: String): Pair<String, String?> {
-        val regex = Regex("^(.*?)（(.*?)）$")
-        val match = regex.find(text)
-        return if (match != null) {
-            val outside = match.groupValues[1].trim()
-            val inside = match.groupValues[2].trim()
-            Pair(outside, inside.ifEmpty { null })
-        } else {
-            Pair(text.trim(), null)
-        }
+        if (!text.endsWith('）')) return Pair(text.trim(), null)
+        val bracketStart = text.lastIndexOf('（')
+        if (bracketStart == -1) return Pair(text.trim(), null)
+        
+        val outside = text.substring(0, bracketStart).trim()
+        val inside = text.substring(bracketStart + 1, text.length - 1).trim()
+        return Pair(outside, inside.ifEmpty { null })
     }
 
     override fun parse(content: String): SyncedLyrics {
-        val content = preformattingTTML(content)
+        val preformattedContent = preformattingTTML(content)
         val parsedLines = mutableListOf<KaraokeLine>()
         val parser = SimpleXmlParser()
-        val rootElement = parser.parse(content)
+        val rootElement = parser.parse(preformattedContent)
 
         val agentAlignments = parseMetadata(rootElement)
         val iTunesTranslations = parseITunesTranslations(rootElement)
         val allPElements = findAllPElements(rootElement)
 
         allPElements.forEach { pElement ->
-            val begin = pElement.attributes.find { it.name == "begin" }?.value
-            val end = pElement.attributes.find { it.name == "end" }?.value
+            var beginAttr: String? = null
+            var endAttr: String? = null
+            var agentId: String? = null
+            var iTunesLineKey: String? = null
 
-            if (begin != null && end != null) {
-                val currentAlignment = getAlignmentFromAgent(pElement, agentAlignments)
+            for (attr in pElement.attributes) {
+                when (attr.name) {
+                    "begin" -> beginAttr = attr.value
+                    "end" -> endAttr = attr.value
+                    "ttm:agent" -> agentId = attr.value
+                    "itunes:key", "key" -> iTunesLineKey = attr.value
+                }
+            }
 
-                val pLevelTranslationSpan = pElement.children.find { child ->
-                    child.attributes.any { it.name.endsWith(":role") && it.value == "x-translation" } &&
-                            child.attributes.none { it.name.endsWith(":role") && it.value == "x-bg" }
+            if (beginAttr != null && endAttr != null) {
+                val currentAlignment = agentAlignments[agentId] ?: KaraokeAlignment.Start
+
+                var pLevelTranslationSpan: XmlElement? = null
+                for (child in pElement.children) {
+                    if (child.name == "span") {
+                        var isTranslation = false
+                        var isBg = false
+                        for (attr in child.attributes) {
+                            if (attr.name.endsWith(":role")) {
+                                if (attr.value == "x-translation") isTranslation = true
+                                else if (attr.value == "x-bg") isBg = true
+                            }
+                        }
+                        if (isTranslation && !isBg) {
+                            pLevelTranslationSpan = child
+                            break
+                        }
+                    }
                 }
 
-                val iTunesLineKey = pElement.attributes.find { it.name == "itunes:key" || it.name == "key" }?.value
                 val iTunesTranslationRaw = if (iTunesLineKey != null) iTunesTranslations[iTunesLineKey] else null
                 val iTunesTranslationPair = if (iTunesTranslationRaw != null) splitTranslationByBracket(iTunesTranslationRaw) else null
 
                 val syllables = parseSyllablesFromChildren(pElement.children)
+                
+                val accompanimentLines = mutableListOf<KaraokeLine.AccompanimentKaraokeLine>()
+                for (child in pElement.children) {
+                    if (child.name == "span") {
+                        var isBg = false
+                        for (attr in child.attributes) {
+                            if (attr.name.endsWith(":role") && attr.value == "x-bg") {
+                                isBg = true
+                                break
+                            }
+                        }
+                        
+                        if (isBg) {
+                            var bgSpanBegin: String? = null
+                            var bgSpanEnd: String? = null
+                            var bgITunesLineKey: String? = iTunesLineKey
 
-                if (syllables.isNotEmpty()) {
-                    parsedLines.add(
-                        KaraokeLine(
-                            syllables = syllables,
-                            translation = pLevelTranslationSpan?.text?.trim()
-                                ?: iTunesTranslationPair?.first, // Main lyrics from outside brackets
-                            isAccompaniment = false,
-                            alignment = currentAlignment,
-                            start = begin.parseAsTime(),
-                            end = end.parseAsTime()
-                        )
-                    )
-                }
-
-                pElement.children.forEach { child ->
-                    if (child.name == "span" && child.attributes.any {
-                            it.name.endsWith(":role") && it.value == "x-bg"
-                        }) {
-                        val bgSpanBegin = child.attributes.find { it.name == "begin" }?.value
-                        val bgSpanEnd = child.attributes.find { it.name == "end" }?.value
-
-                        val accompanimentSyllables = parseSyllablesFromChildren(child.children)
-                        if (accompanimentSyllables.isNotEmpty()) {
-                            val bgTranslationSpan = child.children.find { bgChild ->
-                                bgChild.attributes.any { it.name.endsWith(":role") && it.value == "x-translation" }
+                            for (attr in child.attributes) {
+                                when (attr.name) {
+                                    "begin" -> bgSpanBegin = attr.value
+                                    "end" -> bgSpanEnd = attr.value
+                                    "itunes:key", "key" -> bgITunesLineKey = attr.value
+                                }
                             }
 
-                            val bgITunesLineKey = child.attributes.find { it.name == "itunes:key" || it.name == "key" }?.value
-                                ?: iTunesLineKey
-                            val bgITunesTranslationRaw = if (bgITunesLineKey != null) iTunesTranslations[bgITunesLineKey] else null
-                            val bgITunesTranslationPair = if (bgITunesTranslationRaw != null) splitTranslationByBracket(bgITunesTranslationRaw) else null
+                            val accompanimentSyllables = parseSyllablesFromChildren(child.children)
+                            if (accompanimentSyllables.isNotEmpty()) {
+                                var bgTranslationSpan: XmlElement? = null
+                                for (bgChild in child.children) {
+                                    if (bgChild.name == "span") {
+                                        for (attr in bgChild.attributes) {
+                                            if (attr.name.endsWith(":role") && attr.value == "x-translation") {
+                                                bgTranslationSpan = bgChild
+                                                break
+                                            }
+                                        }
+                                        if (bgTranslationSpan != null) break
+                                    }
+                                }
 
-                            parsedLines.add(
-                                KaraokeLine(
-                                    syllables = accompanimentSyllables,
-                                    translation = bgTranslationSpan?.text?.trim()
-                                        ?: bgITunesTranslationPair?.second // Backing vocals from inside brackets
-                                        ?: bgITunesTranslationPair?.first, // Fallback to outside if inside is empty
-                                    isAccompaniment = true,
-                                    alignment = currentAlignment,
-                                    start = bgSpanBegin?.parseAsTime()
-                                        ?: accompanimentSyllables.first().start,
-                                    end = bgSpanEnd?.parseAsTime()
-                                        ?: accompanimentSyllables.last().end
+                                val bgITunesTranslationRaw = if (bgITunesLineKey != null) iTunesTranslations[bgITunesLineKey] else null
+                                val bgITunesTranslationPair = if (bgITunesTranslationRaw != null) splitTranslationByBracket(bgITunesTranslationRaw) else null
+
+                                accompanimentLines.add(
+                                    KaraokeLine.AccompanimentKaraokeLine(
+                                        syllables = accompanimentSyllables,
+                                        translation = bgTranslationSpan?.text?.trim()
+                                            ?: bgITunesTranslationPair?.second // Backing vocals from inside brackets
+                                            ?: bgITunesTranslationPair?.first, // Fallback to outside if inside is empty
+                                        alignment = currentAlignment,
+                                        start = bgSpanBegin?.parseAsTime()
+                                            ?: accompanimentSyllables.first().start,
+                                        end = bgSpanEnd?.parseAsTime()
+                                            ?: accompanimentSyllables.last().end
+                                    )
                                 )
-                            )
+                            }
                         }
-
                     }
+                }
+
+                if (syllables.isNotEmpty() || accompanimentLines.isNotEmpty()) {
+                    parsedLines.add(
+                        KaraokeLine.MainKaraokeLine(
+                            syllables = if (syllables.isEmpty() && accompanimentLines.isNotEmpty()) {
+                                // 如果只有和声没有主音节（这在某些格式中可能发生），使用和声的时间作为占位
+                                listOf(KaraokeSyllable("", accompanimentLines.first().start, accompanimentLines.first().start))
+                            } else syllables,
+                            translation = pLevelTranslationSpan?.text?.trim()
+                                ?: iTunesTranslationPair?.first,
+                            alignment = currentAlignment,
+                            start = beginAttr.parseAsTime(),
+                            end = endAttr.parseAsTime(),
+                            accompanimentLines = accompanimentLines.ifEmpty { null }
+                        )
+                    )
                 }
             }
         }

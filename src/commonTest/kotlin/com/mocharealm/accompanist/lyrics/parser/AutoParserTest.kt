@@ -44,24 +44,21 @@ class AutoParserTest {
 
         val data = AutoParser.Builder().build().parse(enhancedLrc)
 
-        assertEquals(3, data.lines.size)
+        assertEquals(2, data.lines.size)
 
         // 验证v1对齐方式
-        val v1Line = data.lines[0] as KaraokeLine
+        val v1Line = data.lines[0] as KaraokeLine.MainKaraokeLine
         assertEquals(KaraokeAlignment.Start, v1Line.alignment)
-        assertFalse(v1Line.isAccompaniment)
         assertEquals("宝贝 我们并不完美", v1Line.translation)
 
         // 验证v2对齐方式
-        val v2Line = data.lines[1] as KaraokeLine
+        val v2Line = data.lines[1] as KaraokeLine.MainKaraokeLine
         assertEquals(KaraokeAlignment.End, v2Line.alignment)
-        assertFalse(v2Line.isAccompaniment)
         assertEquals("我对你了如指掌", v2Line.translation)
 
         // 验证bg跟随v2的对齐方式
-        val bgLine = data.lines[2] as KaraokeLine
+        val bgLine = v2Line.accompanimentLines?.first()!!
         assertEquals(KaraokeAlignment.End, bgLine.alignment) // 应该跟随v2的End对齐
-        assertTrue(bgLine.isAccompaniment)
         assertEquals("背景音", bgLine.translation)
     }
 
@@ -108,10 +105,9 @@ class AutoParserTest {
             override fun parse(lines: List<String>): SyncedLyrics {
                 return SyncedLyrics(
                     lines = listOf(
-                        KaraokeLine(
+                        KaraokeLine.MainKaraokeLine(
                             syllables = listOf(),
                             translation = null,
-                            isAccompaniment = false,
                             alignment = KaraokeAlignment.Start,
                             start = 0,
                             end = 1000

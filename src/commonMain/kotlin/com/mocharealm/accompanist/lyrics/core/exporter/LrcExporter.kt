@@ -24,23 +24,18 @@ object LrcExporter : ILyricsExporter {
         if (lyrics.lines.isEmpty()) return ""
 
         val builder = StringBuilder()
-        var lastEndTime = 0
 
         if (lyrics.title.isNotBlank()) {
             builder.appendLine("[ti:${lyrics.title}]")
         }
-        if (lyrics.artists != null && lyrics.artists.isNotEmpty() && lyrics.artists.all { it.name.isNotBlank() }) {
+        if (!lyrics.artists.isNullOrEmpty() && lyrics.artists.all { it.name.isNotBlank() }) {
             builder.appendLine(
-                "[ar:${lyrics.artists.joinToString("/") { it.type + ":" + it.name }}]"
+                "[ar:${lyrics.artists.joinToString("/") { it.name }}]"
             )
         }
 
         lyrics.lines.forEach { line ->
-            if (line.start - lastEndTime > 0) {
-                builder.appendLine(lastEndTime.toTimeFormattedString())
-            }
-
-            val timeTag = line.start.toTimeFormattedString()
+            val timeTag = "[${line.start.toTimeFormattedString()}]"
 
             when (line) {
                 is SyncedLine -> {
@@ -49,13 +44,29 @@ object LrcExporter : ILyricsExporter {
                 }
 
                 is KaraokeLine -> {
-                    val content = line.syllables.joinToString("") { it.content }.trim()
-                    builder.appendLine("$timeTag$content")
+                    // Export Main Line with syllable timing
+                    val syllablesStr = line.syllables.joinToString("") { s ->
+                        "<${s.start.toTimeFormattedString()}>${s.content}"
+                    } + "<${line.end.toTimeFormattedString()}>"
+                    
+                    builder.appendLine("$timeTag$syllablesStr")
                     line.translation?.let { builder.appendLine("$timeTag$it") }
+                    
+                    if (line is KaraokeLine.MainKaraokeLine) {
+                        line.accompanimentLines?.forEach { bgLine ->
+                            val bgSyllablesStr = bgLine.syllables.joinToString("") { s ->
+                                "<${s.start.toTimeFormattedString()}>${s.content}"
+                            } + "<${bgLine.end.toTimeFormattedString()}>"
+                            
+                            builder.appendLine("[bg:$bgSyllablesStr]")
+                            
+                            bgLine.translation?.let { trans ->
+                                builder.appendLine("[bg:<${bgLine.start.toTimeFormattedString()}>$trans<${bgLine.end.toTimeFormattedString()}>]")
+                            }
+                        }
+                    }
                 }
             }
-
-            lastEndTime = line.end
         }
 
         return builder.toString()

@@ -17,10 +17,28 @@ object LyricifySyllableParser: ILyricsParser {
 
     override fun parse(lines:List<String>): SyncedLyrics {
         val lyricsLines = LrcMetadataHelper.removeAttributes(lines)
-        val data = lyricsLines.mapNotNull { line->
-            if (line.isBlank()) null else parseLine(line)
+        val data = mutableListOf<KaraokeLine>()
+        lyricsLines.forEach { line ->
+            if (line.isNotBlank()) {
+                val parsed = parseLine(line)
+                if (parsed is KaraokeLine.AccompanimentKaraokeLine && data.isNotEmpty()) {
+                    val last = data.last()
+                    if (last is KaraokeLine.MainKaraokeLine) {
+                        val updated = last.copy(
+                            accompanimentLines = (last.accompanimentLines ?: emptyList()) + parsed
+                        )
+                        data[data.size - 1] = updated
+                    } else {
+                        data.add(parsed)
+                    }
+                } else {
+                    data.add(parsed)
+                }
+            }
         }
-        return SyncedLyrics(lines = data)
+        return SyncedLyrics(
+            lines = data
+        )
     }
 
     private fun parseLine(line:String): KaraokeLine {
@@ -70,6 +88,10 @@ object LyricifySyllableParser: ILyricsParser {
         val startTime = if (syllables.isNotEmpty()) syllables[0].start else 0
         val endTime = if (syllables.isNotEmpty()) syllables.last().end else 0
 
-        return KaraokeLine(syllables, null, isAccompaniment, alignment, startTime, endTime)
+        return if (isAccompaniment) {
+            KaraokeLine.AccompanimentKaraokeLine(syllables, null, alignment, startTime, endTime)
+        } else {
+            KaraokeLine.MainKaraokeLine(syllables, null, alignment, startTime, endTime)
+        }
     }
 }

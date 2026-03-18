@@ -47,17 +47,17 @@ class LyricifySyllableParserTest {
         )
         val data = LyricifySyllableParser.parse(lys)
 
-        assertEquals(3, data.lines.size)
+        assertEquals(2, data.lines.size)
 
         // Validate KaraokeAlignment
         assertEquals(KaraokeAlignment.End, (data.lines[0] as KaraokeLine).alignment)
         assertEquals(KaraokeAlignment.Start, (data.lines[1] as KaraokeLine).alignment)
-        assertEquals(KaraokeAlignment.End, (data.lines[2] as KaraokeLine).alignment)
+        assertEquals(KaraokeAlignment.End, (data.lines[1] as KaraokeLine.MainKaraokeLine).accompanimentLines?.first()?.alignment)
 
-        // Validate isAccompaniment
-        assertFalse((data.lines[0] as KaraokeLine).isAccompaniment)
-        assertFalse((data.lines[1] as KaraokeLine).isAccompaniment)
-        assertTrue((data.lines[2] as KaraokeLine).isAccompaniment)
+        // Validate types
+        assertTrue(data.lines[0] is KaraokeLine.MainKaraokeLine)
+        assertTrue(data.lines[1] is KaraokeLine.MainKaraokeLine)
+        assertTrue((data.lines[1] as KaraokeLine.MainKaraokeLine).accompanimentLines?.first() is KaraokeLine.AccompanimentKaraokeLine)
     }
 
     @Test
@@ -69,7 +69,7 @@ class LyricifySyllableParserTest {
         val line = data.lines[0] as KaraokeLine
         assertEquals(2, line.syllables.size)
         assertEquals(KaraokeAlignment.Start, line.alignment)
-        assertFalse(line.isAccompaniment)
+        assertTrue(line is KaraokeLine.MainKaraokeLine)
     }
 
     @Test
@@ -124,7 +124,7 @@ class LyricifySyllableParserTest {
         val data = LyricifySyllableParser.parse(lys)
 
         assertEquals(2, data.lines.size)
-        assertTrue((data.lines[0] as KaraokeLine).isAccompaniment)
-        assertTrue((data.lines[1] as KaraokeLine).isAccompaniment)
+        assertTrue(data.lines[0] is KaraokeLine.AccompanimentKaraokeLine)
+        assertTrue(data.lines[1] is KaraokeLine.AccompanimentKaraokeLine)
     }
 }
