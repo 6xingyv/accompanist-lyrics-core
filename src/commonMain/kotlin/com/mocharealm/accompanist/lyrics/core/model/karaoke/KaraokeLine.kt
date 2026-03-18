@@ -1,7 +1,6 @@
 package com.mocharealm.accompanist.lyrics.core.model.karaoke
 
 import com.mocharealm.accompanist.lyrics.core.model.ISyncedLine
-import com.mocharealm.accompanist.lyrics.core.model.synced.SyncedLine
 
 /**
  * Represents a line of lyrics with syllable-level timing information (Karaoke).
@@ -20,7 +19,6 @@ sealed interface KaraokeLine : ISyncedLine {
     override val start: Int
     override val end: Int
     val phonetic: String?
-
 
     /**
      * Calculates the progress of the current line based on the current time.
@@ -61,11 +59,13 @@ sealed interface KaraokeLine : ISyncedLine {
         override val phonetic: String? = null,
         val accompanimentLines: List<AccompanimentKaraokeLine>? = null
     ) : KaraokeLine {
+
         init {
             require(end >= start)
         }
 
         override val duration = end - start
+
     }
 
     data class AccompanimentKaraokeLine(
@@ -82,4 +82,31 @@ sealed interface KaraokeLine : ISyncedLine {
 
         override val duration = end - start
     }
+}
+
+fun KaraokeLine.copy(
+    syllables: List<KaraokeSyllable> = this.syllables,
+    translation: String? = this.translation,
+    alignment: KaraokeAlignment = this.alignment,
+    start: Int = this.start,
+    end: Int = this.end,
+    phonetic: String? = this.phonetic
+): KaraokeLine = when (this) {
+    is KaraokeLine.MainKaraokeLine -> this.copy(
+        syllables = syllables,
+        translation = translation,
+        alignment = alignment,
+        start = start,
+        end = end,
+        phonetic = phonetic
+    )
+
+    is KaraokeLine.AccompanimentKaraokeLine -> this.copy(
+        syllables = syllables,
+        translation = translation,
+        alignment = alignment,
+        start = start,
+        end = end,
+        phonetic = phonetic
+    )
 }

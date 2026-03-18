@@ -1,4 +1,4 @@
-package com.mocharealm.accompanist.lyrics.utils
+package com.mocharealm.accompanist.lyrics.core.utils
 
 import com.mocharealm.accompanist.lyrics.core.utils.parseAsTime
 import kotlin.test.Test
