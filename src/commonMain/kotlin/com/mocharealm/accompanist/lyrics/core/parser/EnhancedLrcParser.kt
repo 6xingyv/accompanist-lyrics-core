@@ -21,8 +21,8 @@ import kotlin.math.abs
  * ```
  */
 object EnhancedLrcParser : ILyricsParser {
-    private val lineRegex = Regex("^\\[(.*?)](\\s*(.*))?$")
     private val voiceParser = Regex("^(v\\d+)\\s*:\\s*(.*)")
+    private val tagRegex = Regex("\\[(.*?)]")
 
     private fun isTimestamp(s: String): Boolean {
         if (s.length < 5) return false
@@ -38,9 +38,7 @@ object EnhancedLrcParser : ILyricsParser {
 
     override fun parse(lines: List<String>): SyncedLyrics {
         val lyricsLines = LrcMetadataHelper.removeAttributes(lines)
-        val rawData = lyricsLines.asSequence()
-            .mapNotNull { line -> parseLine(line) }
-            .toList()
+        val rawData = lyricsLines.flatMap { line -> parseLine(line) }
             .combineRawWithTranslation()
             .rearrangeAccompanimentAlignment()
         
@@ -74,65 +72,109 @@ object EnhancedLrcParser : ILyricsParser {
         )
     }
 
-    private fun parseLine(string: String): KaraokeLine? {
-        val lineMatch = lineRegex.find(string) ?: return null
+    private fun parseLine(string: String): List<KaraokeLine> {
+        val matches = tagRegex.findAll(string).toList()
+        if (matches.isEmpty()) return emptyList()
 
-        val tagContentRaw = lineMatch.groupValues[1]
-        val mainContent = lineMatch.groupValues[3] ?: ""
-
-        // Case 1: Background line [bg:...]
-        if (tagContentRaw.trim().startsWith("bg:")) {
-            val bgTagBody = tagContentRaw.trim().substring(3).trim()
-            
-            // Background line MUST contain syllables within the tag body
-            val syllables = proceduralParseSyllables(bgTagBody)
-            if (syllables.isNotEmpty()) {
-                 return KaraokeLine.AccompanimentKaraokeLine(
-                    syllables = syllables,
-                    translation = null,
-                    alignment = KaraokeAlignment.Unspecified,
-                    start = syllables.first().start,
-                    end = syllables.last().end
-                )
+        var lastEnd = 0
+        val leadingTags = mutableListOf<MatchResult>()
+        for (match in matches) {
+            val prefix = string.substring(lastEnd, match.range.first)
+            if (prefix.isBlank()) {
+                leadingTags.add(match)
+                lastEnd = match.range.last + 1
+            } else {
+                break
             }
-            return null
         }
         
-        // Case 2: Standard/Enhanced line [time]...
-        val tagContent = tagContentRaw.trim()
-        if (isTimestamp(tagContent)) {
-            val lineStartTime = tagContent.parseAsTime()
-            val content = mainContent.trim()
-            val syllables = proceduralParseSyllables(content)
-
-            val (alignment, textContent) = voiceParser.find(content)?.let {
-                val align = when (it.groupValues[1]) {
-                    "v1" -> KaraokeAlignment.Start
-                    "v2" -> KaraokeAlignment.End
-                    else -> KaraokeAlignment.Unspecified
-                }
-                align to it.groupValues[2].trim()
-            } ?: (KaraokeAlignment.Unspecified to content)
-
-            return if (syllables.isNotEmpty()) {
-                KaraokeLine.MainKaraokeLine(
-                    syllables = syllables,
-                    translation = null,
-                    alignment = alignment,
-                    start = syllables.first().start,
-                    end = syllables.last().end
-                )
-            } else {
-                KaraokeLine.MainKaraokeLine(
-                    syllables = listOf(KaraokeSyllable(textContent, lineStartTime, lineStartTime)),
-                    translation = null,
-                    alignment = alignment,
-                    start = lineStartTime,
-                    end = lineStartTime
-                )
+        if (leadingTags.isEmpty()) return emptyList()
+        
+        val content = string.substring(lastEnd).trim()
+        val results = mutableListOf<KaraokeLine>()
+        
+        val timestamps = mutableListOf<Int>()
+        var bgTag: String? = null
+        
+        for (match in leadingTags) {
+            val tagContentRaw = match.groupValues[1]
+            if (tagContentRaw.trim().startsWith("bg:")) {
+                bgTag = tagContentRaw.trim().substring(3).trim()
+            } else if (isTimestamp(tagContentRaw.trim())) {
+                timestamps.add(tagContentRaw.trim().parseAsTime())
             }
         }
-        return null
+        
+        val bgSyllables = bgTag?.let { proceduralParseSyllables(it) } ?: emptyList()
+        val mainSyllables = if (timestamps.isNotEmpty()) proceduralParseSyllables(content) else emptyList()
+        val (alignment, textContent) = voiceParser.find(content)?.let {
+            val align = when (it.groupValues[1]) {
+                "v1" -> KaraokeAlignment.Start
+                "v2" -> KaraokeAlignment.End
+                else -> KaraokeAlignment.Unspecified
+            }
+            align to it.groupValues[2].trim()
+        } ?: (KaraokeAlignment.Unspecified to content)
+
+        if (timestamps.isNotEmpty()) {
+            val firstTimestamp = timestamps.first()
+            
+            val relativeMainSyllables = if (mainSyllables.isNotEmpty() && mainSyllables.first().start >= firstTimestamp) {
+                mainSyllables.map { it.copy(start = it.start - firstTimestamp, end = it.end - firstTimestamp) }
+            } else {
+                mainSyllables
+            }
+
+            val relativeBgSyllables = if (bgSyllables.isNotEmpty() && bgSyllables.first().start >= firstTimestamp) {
+                bgSyllables.map { it.copy(start = it.start - firstTimestamp, end = it.end - firstTimestamp) }
+            } else {
+                bgSyllables
+            }
+
+            for (startTime in timestamps) {
+                // Add Main Line
+                if (relativeMainSyllables.isNotEmpty()) {
+                    val shifted = relativeMainSyllables.map { it.copy(start = it.start + startTime, end = it.end + startTime) }
+                    results.add(KaraokeLine.MainKaraokeLine(
+                        syllables = shifted,
+                        translation = null,
+                        alignment = alignment,
+                        start = shifted.first().start,
+                        end = shifted.last().end
+                    ))
+                } else {
+                    results.add(KaraokeLine.MainKaraokeLine(
+                        syllables = listOf(KaraokeSyllable(textContent, startTime, startTime)),
+                        translation = null,
+                        alignment = alignment,
+                        start = startTime,
+                        end = startTime
+                    ))
+                }
+
+                // Add Background Line (if present)
+                if (relativeBgSyllables.isNotEmpty()) {
+                    val shifted = relativeBgSyllables.map { it.copy(start = it.start + startTime, end = it.end + startTime) }
+                    results.add(KaraokeLine.AccompanimentKaraokeLine(
+                        syllables = shifted,
+                        translation = null,
+                        alignment = KaraokeAlignment.Unspecified,
+                        start = shifted.first().start,
+                        end = shifted.last().end
+                    ))
+                }
+            }
+        } else if (bgSyllables.isNotEmpty()) {
+            results.add(KaraokeLine.AccompanimentKaraokeLine(
+                syllables = bgSyllables,
+                translation = null,
+                alignment = KaraokeAlignment.Unspecified,
+                start = bgSyllables.first().start,
+                end = bgSyllables.last().end
+            ))
+        }
+
+        return results
     }
 
     private fun proceduralParseSyllables(content: String): List<KaraokeSyllable> {

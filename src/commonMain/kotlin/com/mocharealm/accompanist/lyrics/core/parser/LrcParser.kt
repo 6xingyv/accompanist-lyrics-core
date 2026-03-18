@@ -11,7 +11,7 @@ import com.mocharealm.accompanist.lyrics.core.utils.parseAsTime
  * It uses a regular expression to match the LRC line format: `[mm:ss.xx]Lyric content` or `[mm:ss.xxx]Lyric content`.
  */
 object LrcParser : ILyricsParser {
-    private val parser = Regex("\\[(?:(\\d{1,2}):)?(\\d{1,2}:\\d{1,2}\\.\\d{2,3})](.*)")
+    private val timestampRegex = Regex("\\[(?:(\\d{1,2}):)?(\\d{1,2}:\\d{1,2}\\.\\d{2,3})]")
 
     override fun parse(lines: List<String>): SyncedLyrics {
         val lyricsLines = LrcMetadataHelper.removeAttributes(lines)
@@ -31,18 +31,23 @@ object LrcParser : ILyricsParser {
     }
 
     private fun parseLine(content: String): List<UncheckedSyncedLine> {
-        return parser.findAll(content).map { matchResult ->
+        val matches = timestampRegex.findAll(content).toList()
+        if (matches.isEmpty()) return emptyList()
+
+        val lastMatch = matches.last()
+        val lyric = content.substring(lastMatch.range.last + 1).trim()
+
+        return matches.map { matchResult ->
             val hour = matchResult.groupValues[1]
             val time = matchResult.groupValues[2]
-            val lyric = matchResult.groupValues[3]
             val fullTime = if (hour.isNotEmpty()) "$hour:$time" else time
             UncheckedSyncedLine(
                 start = fullTime.parseAsTime(),
                 end = 0,
-                content = lyric.trim(),
+                content = lyric,
                 translation = null
             )
-        }.toList()
+        }
     }
 
     private fun List<UncheckedSyncedLine>.combineRawWithTranslation(): List<UncheckedSyncedLine> {
