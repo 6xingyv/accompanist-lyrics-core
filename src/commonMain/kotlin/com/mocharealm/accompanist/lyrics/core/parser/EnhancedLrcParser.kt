@@ -22,26 +22,42 @@ import kotlin.math.abs
  */
 object EnhancedLrcParser : ILyricsParser {
     private val voiceParser = Regex("^(v\\d+)\\s*:\\s*(.*)")
-    private val tagRegex = Regex("""\\[(.*?)\\]""")
+    private val tagRegex = Regex("""\[(.*?)\]""")
+    private val timestampPattern = Regex("""\d+([:.]\d+)+""")
 
     private fun isTimestamp(s: String): Boolean {
-        if (s.length < 5) return false
-        var colonCount = 0
-        var hasDot = false
-        for (c in s) {
-            if (c == ':') colonCount++
-            else if (c == '.') hasDot = true
-            else if (!c.isDigit()) return false
+        return timestampPattern.matches(s.trim())
+    }
+
+    private fun proceduralParseSyllables(content: String): List<KaraokeSyllable> {
+        if (content.isBlank()) return emptyList()
+
+        val syllables = mutableListOf<KaraokeSyllable>()
+        val syllableRegex = Regex("""<([^>]+)>([^<]*)""")
+        val matches = syllableRegex.findAll(content).toList()
+
+        for (match in matches) {
+            val tsPart = match.groupValues[1].trim()
+            val text = match.groupValues[2]
+
+            if (isTimestamp(tsPart)) {
+                val time = runCatching { tsPart.parseAsTime() }.getOrNull()
+                if (time != null) {
+                    syllables.add(KaraokeSyllable(text, time, time))
+                }
+            }
         }
-        return colonCount >= 1 && hasDot
+
+        return if (syllables.isEmpty()) emptyList() else syllables.rearrangeTime()
     }
 
     override fun parse(lines: List<String>): SyncedLyrics {
-        val lyricsLines = LrcMetadataHelper.removeAttributes(lines)
+        val lyricsLines = LrcMetadataHelper.removeAttributes(lines).filter { it.isNotBlank() }
+
         val rawData = lyricsLines.flatMap { line -> parseLine(line) }
             .combineRawWithTranslation()
             .rearrangeAccompanimentAlignment()
-        
+
         val data = mutableListOf<KaraokeLine>()
         rawData.forEach { line ->
             if (line is KaraokeLine.AccompanimentKaraokeLine && data.isNotEmpty()) {
@@ -58,6 +74,7 @@ object EnhancedLrcParser : ILyricsParser {
                 data.add(line)
             }
         }
+
         val attributes = LrcMetadataHelper.parse(lines)
         return SyncedLyrics(
             lines = data,
@@ -73,6 +90,8 @@ object EnhancedLrcParser : ILyricsParser {
     }
 
     private fun parseLine(string: String): List<KaraokeLine> {
+        if (string.isBlank()) return emptyList()
+
         val matches = tagRegex.findAll(string).toList()
         if (matches.isEmpty()) return emptyList()
 
@@ -83,58 +102,47 @@ object EnhancedLrcParser : ILyricsParser {
             if (prefix.isBlank()) {
                 leadingTags.add(match)
                 lastEnd = match.range.last + 1
-            } else {
-                break
-            }
+            } else break
         }
-        
+
         if (leadingTags.isEmpty()) return emptyList()
-        
-        val content = string.substring(lastEnd).trim()
+
+        val content = if (lastEnd < string.length) string.substring(lastEnd).trim() else ""
         val results = mutableListOf<KaraokeLine>()
-        
         val timestamps = mutableListOf<Int>()
         var bgTag: String? = null
-        
+
         for (match in leadingTags) {
-            val tagContentRaw = match.groupValues[1]
-            if (tagContentRaw.trim().startsWith("bg:")) {
-                bgTag = tagContentRaw.trim().substring(3).trim()
-            } else if (isTimestamp(tagContentRaw.trim())) {
-                timestamps.add(tagContentRaw.trim().parseAsTime())
+            val tagContentRaw = match.groupValues[1].trim()
+            if (tagContentRaw.startsWith("bg:")) {
+                bgTag = tagContentRaw.substring(3).trim()
+            } else if (isTimestamp(tagContentRaw)) {
+                runCatching { tagContentRaw.parseAsTime() }.getOrNull()?.let { timestamps.add(it) }
             }
         }
-        
+
         val bgSyllables = bgTag?.let { proceduralParseSyllables(it) } ?: emptyList()
-        val mainSyllables = if (timestamps.isNotEmpty()) proceduralParseSyllables(content) else emptyList()
-        val (alignment, textContent) = voiceParser.find(content)?.let {
-            val align = when (it.groupValues[1]) {
-                "v1" -> KaraokeAlignment.Start
-                "v2" -> KaraokeAlignment.End
-                else -> KaraokeAlignment.Unspecified
-            }
-            align to it.groupValues[2].trim()
-        } ?: (KaraokeAlignment.Unspecified to content)
+        val mainSyllables = if (timestamps.isNotEmpty() && content.isNotBlank()) {
+            proceduralParseSyllables(content)
+        } else emptyList()
+
+        val voiceMatch = voiceParser.find(content)
+        val alignment = when (voiceMatch?.groupValues?.get(1)) {
+            "v1" -> KaraokeAlignment.Start
+            "v2" -> KaraokeAlignment.End
+            else -> KaraokeAlignment.Unspecified
+        }
+        val textContent = voiceMatch?.groupValues?.get(2)?.trim() ?: content
+
+        val firstTimestamp = timestamps.firstOrNull() ?: 0
+        val isRelative = mainSyllables.firstOrNull()?.start?.let { it < firstTimestamp } ?: false
+        val bgIsRelative = bgSyllables.firstOrNull()?.start?.let { it < firstTimestamp } ?: false
 
         if (timestamps.isNotEmpty()) {
-            val firstTimestamp = timestamps.first()
-            
-            val relativeMainSyllables = if (mainSyllables.isNotEmpty() && mainSyllables.first().start >= firstTimestamp) {
-                mainSyllables.map { it.copy(start = it.start - firstTimestamp, end = it.end - firstTimestamp) }
-            } else {
-                mainSyllables
-            }
-
-            val relativeBgSyllables = if (bgSyllables.isNotEmpty() && bgSyllables.first().start >= firstTimestamp) {
-                bgSyllables.map { it.copy(start = it.start - firstTimestamp, end = it.end - firstTimestamp) }
-            } else {
-                bgSyllables
-            }
-
             for (startTime in timestamps) {
-                // Add Main Line
-                if (relativeMainSyllables.isNotEmpty()) {
-                    val shifted = relativeMainSyllables.map { it.copy(start = it.start + startTime, end = it.end + startTime) }
+                if (mainSyllables.isNotEmpty()) {
+                    val offset = if (isRelative) startTime else startTime - firstTimestamp
+                    val shifted = mainSyllables.map { it.copy(start = it.start + offset, end = it.end + offset) }
                     results.add(KaraokeLine.MainKaraokeLine(
                         syllables = shifted,
                         translation = null,
@@ -142,7 +150,7 @@ object EnhancedLrcParser : ILyricsParser {
                         start = shifted.first().start,
                         end = shifted.last().end
                     ))
-                } else {
+                } else if (textContent.isNotBlank()) {
                     results.add(KaraokeLine.MainKaraokeLine(
                         syllables = listOf(KaraokeSyllable(textContent, startTime, startTime)),
                         translation = null,
@@ -152,9 +160,9 @@ object EnhancedLrcParser : ILyricsParser {
                     ))
                 }
 
-                // Add Background Line (if present)
-                if (relativeBgSyllables.isNotEmpty()) {
-                    val shifted = relativeBgSyllables.map { it.copy(start = it.start + startTime, end = it.end + startTime) }
+                if (bgSyllables.isNotEmpty()) {
+                    val bgOffset = if (bgIsRelative) startTime else startTime - firstTimestamp
+                    val shifted = bgSyllables.map { it.copy(start = it.start + bgOffset, end = it.end + bgOffset) }
                     results.add(KaraokeLine.AccompanimentKaraokeLine(
                         syllables = shifted,
                         translation = null,
@@ -177,41 +185,11 @@ object EnhancedLrcParser : ILyricsParser {
         return results
     }
 
-    private fun proceduralParseSyllables(content: String): List<KaraokeSyllable> {
-        val syllables = mutableListOf<KaraokeSyllable>()
-        var currentIndex = 0
-        while (currentIndex < content.length) {
-            val openTagStart = content.indexOf('<', currentIndex)
-            if (openTagStart == -1) break
-
-            val openTagEnd = content.indexOf('>', openTagStart)
-            if (openTagEnd == -1) break
-
-            val timestamp = content.substring(openTagStart + 1, openTagEnd).trim()
-
-            if (!isTimestamp(timestamp)) {
-                currentIndex = openTagEnd + 1
-                continue
-            }
-
-            val nextOpenTagStart = content.indexOf('<', openTagEnd)
-            val textEnd = if (nextOpenTagStart == -1) content.length else nextOpenTagStart
-            val text = content.substring(openTagEnd + 1, textEnd)
-
-            syllables.add(KaraokeSyllable(text, timestamp.parseAsTime(), timestamp.parseAsTime()))
-            currentIndex = textEnd
-        }
-        return syllables.rearrangeTime()
-    }
-
     private fun List<KaraokeSyllable>.rearrangeTime(): List<KaraokeSyllable> {
         if (this.isEmpty()) return emptyList()
-        val list = ArrayList<KaraokeSyllable>(this.size)
+        val list = mutableListOf<KaraokeSyllable>()
         for (i in 0 until this.size - 1) {
-            val syllable = this[i]
-            if (syllable.content.isNotEmpty()) {
-                list.add(syllable.copy(end = this[i + 1].start))
-            }
+            list.add(this[i].copy(end = this[i + 1].start))
         }
         val last = this.last()
         if (last.content.isNotEmpty()) {
@@ -228,19 +206,19 @@ object EnhancedLrcParser : ILyricsParser {
             if (i in usedIndices) continue
             val line = this[i]
             val content = line.syllables.joinToString("") { it.content }.trim()
-            
+
             var translationFound = false
             for (j in i + 1 until this.size) {
                 if (j in usedIndices) continue
                 val nextLine = this[j]
-                
-                // Allow AccompanimentKaraokeLine to match MainKaraokeLine as translation if times are close
-                val isCompatibleType = (line::class == nextLine::class) || 
-                                       (line is KaraokeLine.AccompanimentKaraokeLine && nextLine is KaraokeLine.MainKaraokeLine)
-                
-                if (isCompatibleType && abs(line.start - nextLine.start) <= 100) {
+
+                // 兼容逻辑：类型相同，或者当 AccompanimentLine 的翻译未带 bg 标签而被识别为 MainLine 时
+                val isCompatibleType = (line::class == nextLine::class) ||
+                        (line is KaraokeLine.AccompanimentKaraokeLine && nextLine is KaraokeLine.MainKaraokeLine)
+
+                if (isCompatibleType && abs(line.start - nextLine.start) <= 150) {
                     val nextContent = nextLine.syllables.joinToString("") { it.content }.trim()
-                    if (content != nextContent) {
+                    if (content != nextContent && content.isNotEmpty()) {
                         val updated = when (line) {
                             is KaraokeLine.MainKaraokeLine -> line.copy(translation = nextContent)
                             is KaraokeLine.AccompanimentKaraokeLine -> line.copy(translation = nextContent)
@@ -253,7 +231,7 @@ object EnhancedLrcParser : ILyricsParser {
                     }
                 }
             }
-            
+
             if (!translationFound) {
                 list.add(line)
                 usedIndices.add(i)
