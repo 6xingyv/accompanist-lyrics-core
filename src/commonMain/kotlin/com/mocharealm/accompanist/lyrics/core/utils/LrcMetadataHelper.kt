@@ -14,7 +14,7 @@ object LrcMetadataHelper {
     private val METADATA_TAGS = setOf("ar", "ti", "al", "offset", "length")
 
     // This regex is still good for finding the general [tag:value] pattern.
-    private val attributeParser = Regex("^\\[([a-zA-Z]+):([^]]*)]$")
+    private val attributeParser = Regex("""^\[([a-zA-Z]+):\s*(.*)\]\s*$""")
 
     /**
      * Parses a list of lines to extract values for the known metadata tags.

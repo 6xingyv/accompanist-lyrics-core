@@ -7,9 +7,9 @@ import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeSyllable
 import com.mocharealm.accompanist.lyrics.core.utils.KugouKrcMetadataDecoder
 
 object KugouKrcParser : ILyricsParser {
-    private val KRC_LINE_REGEX = Regex("""^\[(\d+),(\d+)](.*)$""")
+    private val KRC_LINE_REGEX = Regex("""^\[(\d+),(\d+)\](.*)$""")
     private val SYLLABLE_REGEX = Regex("""<(\d+),(\d+),\d+>""")
-    private val BG_LINE_REGEX = Regex("""^\[bg:(.*)](.*)$""")
+    private val BG_LINE_REGEX = Regex("""^\[bg:(.*)\](.*)$""")
     private const val LANGUAGE_TAG_START = "[language:"
 
     override fun parse(lines: List<String>): SyncedLyrics = parseInternal(lines.asSequence())

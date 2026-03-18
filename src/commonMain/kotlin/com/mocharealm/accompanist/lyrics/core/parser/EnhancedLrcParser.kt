@@ -22,7 +22,7 @@ import kotlin.math.abs
  */
 object EnhancedLrcParser : ILyricsParser {
     private val voiceParser = Regex("^(v\\d+)\\s*:\\s*(.*)")
-    private val tagRegex = Regex("\\[(.*?)]")
+    private val tagRegex = Regex("""\\[(.*?)\\]""")
 
     private fun isTimestamp(s: String): Boolean {
         if (s.length < 5) return false

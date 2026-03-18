@@ -24,7 +24,13 @@ kotlin {
                 }
             }
         }
-        nodejs()
+        nodejs {
+            testTask {
+                useKarma {
+                    useChromeHeadless()
+                }
+            }
+        }
     }
 
     @OptIn(ExperimentalWasmDsl::class)

@@ -10,47 +10,43 @@ class LyricsFormatGuesser {
 
     init {
         registerFormat(
-            LyricsFormat(
-                "TTML"
-            ) {
-                it.contains("<tt.*xmlns.*=.*http://www.w3.org/ns/ttml.*>".toRegex(RegexOption.MULTILINE))
+            LyricsFormat("TTML") {
+                // 注意：JS 端的 . 不匹配换行符，如果你需要匹配跨行标签，RegexOption.MULTILINE 是对的
+                it.contains("""<tt.*xmlns.*=.*http://www.w3.org/ns/ttml.*>""".toRegex(RegexOption.MULTILINE))
             })
 
         // WARNING: DO NOT CHANGE THE LRC AND ENHANCED_LRC ORDER
         registerFormat(
-            LyricsFormat(
-                "LRC"
-            ) { it.contains("\\[\\d{2}:\\d{2}\\.\\d{2,3}].+".toRegex()) })
+            LyricsFormat("LRC") {
+                it.contains("""\[\d{2}:\d{2}\.\d{2,3}\].+""".toRegex())
+            })
+
         registerFormat(
-            LyricsFormat(
-                "ENHANCED_LRC"
-            ) {
-                val hasVoiceTag = it.contains("\\]v[12]:".toRegex())
+            LyricsFormat("ENHANCED_LRC") {
+                // 修复：将 ] 替换为 \]
+                val hasVoiceTag = it.contains("""\]v[12]:""".toRegex())
 
                 // 检查是否同时有行级和内联时间戳
-                val hasLineTimestamp = it.contains("\\[\\d{2}:\\d{2}\\.\\d{2,3}]".toRegex())
-                val hasInlineTimestamp = it.contains("<\\d{2}:\\d{2}\\.\\d{2,3}>".toRegex())
+                val hasLineTimestamp = it.contains("""\[\d{2}:\d{2}\.\d{2,3}\]""".toRegex())
+                val hasInlineTimestamp = it.contains("""<\d{2}:\d{2}\.\d{2,3}>""".toRegex())
                 val hasBothTimestamps = hasLineTimestamp && hasInlineTimestamp
 
-                // 满足任一条件即认为是Enhanced LRC
                 hasVoiceTag || hasBothTimestamps
             })
 
         registerFormat(
-            LyricsFormat(
-                "LYRICIFY_SYLLABLE"
-            ) { it.contains("[a-zA-Z]+\\s*\\(\\d+,\\d+\\)".toRegex()) })
+            LyricsFormat("LYRICIFY_SYLLABLE") {
+                // 这里原本的 [a-zA-Z] 是字符集，不需要转义，但如果未来要匹配字面量 [，请务必转义
+                it.contains("""[a-zA-Z]+\s*\(\d+,\d+\)""".toRegex())
+            })
 
         registerFormat(
-            LyricsFormat(
-                "KUGOU_KRC"
-            ) {
+            LyricsFormat("KUGOU_KRC") {
                 val lines = it.lines().map { it.trim() }.filter { it.isNotEmpty() }
-                // 行时间戳正则 [0,3946]
-                val lineTimeRegex = """^\[\d+,\d+]""".toRegex()
-                // 字时间戳正则 <0,171,0>字
+                // 修复：确保所有字面量方括号都被转义
+                val lineTimeRegex = """^\[\d+,\d+\]""".toRegex()
                 val wordTimeRegex = """<\d+,\d+,\d+>.{1}""".toRegex()
-                // 确定符合格式
+
                 lines.any { line ->
                     lineTimeRegex.containsMatchIn(line) && wordTimeRegex.containsMatchIn(line)
                 }
