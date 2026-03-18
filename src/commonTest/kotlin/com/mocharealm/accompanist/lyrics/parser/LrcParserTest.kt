@@ -1,7 +1,7 @@
 package com.mocharealm.accompanist.lyrics.parser
 
 import com.mocharealm.accompanist.lyrics.core.model.synced.SyncedLine
-import com.mocharealm.accompanist.lyrics.core.parser.LrcParser
+import com.mocharealm.accompanist.lyrics.core.parser.EnhancedLrcParser
 import com.mocharealm.accompanist.lyrics.core.exporter.LrcExporter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -18,10 +18,10 @@ class LrcParserTest {
             [00:02.50]Line 2
         """.trimIndent().split("\n")
 
-        val result = LrcParser.parse(lrc)
+        val result = EnhancedLrcParser.parse(lrc)
         assertEquals("Song Title", result.title)
         assertEquals(2, result.lines.size)
-        
+
         val line1 = result.lines[0] as SyncedLine
         assertEquals("Line 1", line1.content)
         assertEquals("Translation 1", line1.translation)
@@ -36,11 +36,11 @@ class LrcParserTest {
             [00:10.00]World
         """.trimIndent()
 
-        val parsed = LrcParser.parse(original.split("\n"))
+        val parsed = EnhancedLrcParser.parse(original.split("\n"))
         val exported = LrcExporter.export(parsed)
-        
-        val reParsed = LrcParser.parse(exported.split("\n"))
-        
+
+        val reParsed = EnhancedLrcParser.parse(exported.split("\n"))
+
         assertEquals(parsed.title, reParsed.title)
         assertEquals(parsed.lines.size, reParsed.lines.size)
         assertEquals((parsed.lines[0] as SyncedLine).translation, (reParsed.lines[0] as SyncedLine).translation)

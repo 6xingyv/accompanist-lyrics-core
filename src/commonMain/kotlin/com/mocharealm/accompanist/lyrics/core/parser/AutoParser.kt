@@ -5,7 +5,7 @@ import com.mocharealm.accompanist.lyrics.core.model.SyncedLyrics
 /**
  * A smart parser that automatically detects the lyrics format and uses the appropriate parser.
  *
- * This class combines the functionality of all individual parsers (`LrcParser`, `EnhancedLrcParser`,
+ * This class combines the functionality of all individual parsers (`EnhancedLrcParser`,
  * `TTMLParser`, and `LyricifySyllableParser`) into a single, easy-to-use interface. It uses
  * `LyricsFormatGuesser` to determine the most likely format and then delegates the parsing task.
  *
@@ -16,7 +16,6 @@ class AutoParser(
         TTMLParser,
         LyricifySyllableParser,
         EnhancedLrcParser,
-        LrcParser,
         KugouKrcParser,
     )
 ) : ILyricsParser {

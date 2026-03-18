@@ -2,7 +2,6 @@ package com.mocharealm.accompanist.lyrics.parser
 
 import com.mocharealm.accompanist.lyrics.core.model.synced.SyncedLine
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine
-import com.mocharealm.accompanist.lyrics.core.parser.LrcParser
 import com.mocharealm.accompanist.lyrics.core.parser.EnhancedLrcParser
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -15,15 +14,16 @@ class CompressedTimestampTest {
             [00:12.50][01:30.20][02:15.00]这里是一句重复的副歌歌词
         """.trimIndent().split("\n")
 
-        val result = LrcParser.parse(lrc)
+        val result = EnhancedLrcParser.parse(lrc)
+        // EnhancedLrcParser maps standard LRC to SyncedLine
         assertEquals(3, result.lines.size)
-        
+
         assertEquals(12500, (result.lines[0] as SyncedLine).start)
         assertEquals("这里是一句重复的副歌歌词", (result.lines[0] as SyncedLine).content)
-        
+
         assertEquals(90200, (result.lines[1] as SyncedLine).start)
         assertEquals("这里是一句重复的副歌歌词", (result.lines[1] as SyncedLine).content)
-        
+
         assertEquals(135000, (result.lines[2] as SyncedLine).start)
         assertEquals("这里是一句重复的副歌歌词", (result.lines[2] as SyncedLine).content)
     }

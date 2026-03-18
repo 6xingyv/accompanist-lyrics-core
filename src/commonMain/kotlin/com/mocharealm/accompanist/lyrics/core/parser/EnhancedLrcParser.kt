@@ -1,6 +1,8 @@
 package com.mocharealm.accompanist.lyrics.core.parser
 
 import com.mocharealm.accompanist.lyrics.core.model.SyncedLyrics
+import com.mocharealm.accompanist.lyrics.core.model.ISyncedLine
+import com.mocharealm.accompanist.lyrics.core.model.synced.SyncedLine
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeAlignment
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeSyllable
@@ -22,13 +24,9 @@ import kotlin.math.abs
  */
 object EnhancedLrcParser : ILyricsParser {
     override fun canParse(content: String): Boolean {
-        val hasVoiceTag = content.contains("""\]v[a-zA-Z0-9]+:""".toRegex())
+        // 只要有一层符合 LRC 的括号，即可处理，无论是纯文本、译文还是包含 karaoke 标签
         val hasLineTimestamp = content.contains("""\[\d{2}:\d{2}\.\d{2,3}\]""".toRegex())
-        val hasInlineTimestamp = content.contains("""<\d{2}:\d{2}\.\d{2,3}>""".toRegex())
-
-        val hasBothTimestamps = hasLineTimestamp && hasInlineTimestamp
-
-        return hasVoiceTag || hasBothTimestamps
+        return hasLineTimestamp
     }
     private val voiceParser = Regex("^(v\\d+)\\s*:\\s*(.*)")
     private val tagRegex = Regex("""\[(.*?)\]""")
@@ -66,8 +64,9 @@ object EnhancedLrcParser : ILyricsParser {
         val rawData = lyricsLines.flatMap { line -> parseLine(line) }
             .combineRawWithTranslation()
             .rearrangeAccompanimentAlignment()
+            .rearrangeUncheckedLineTime()
 
-        val data = mutableListOf<KaraokeLine>()
+        val data = mutableListOf<ISyncedLine>()
         rawData.forEach { line ->
             if (line is KaraokeLine.AccompanimentKaraokeLine && data.isNotEmpty()) {
                 val last = data.last()
@@ -98,7 +97,7 @@ object EnhancedLrcParser : ILyricsParser {
         )
     }
 
-    private fun parseLine(string: String): List<KaraokeLine> {
+    private fun parseLine(string: String): List<ISyncedLine> {
         if (string.isBlank()) return emptyList()
 
         val matches = tagRegex.findAll(string).toList()
@@ -117,7 +116,7 @@ object EnhancedLrcParser : ILyricsParser {
         if (leadingTags.isEmpty()) return emptyList()
 
         val content = if (lastEnd < string.length) string.substring(lastEnd).trim() else ""
-        val results = mutableListOf<KaraokeLine>()
+        val results = mutableListOf<ISyncedLine>()
         val timestamps = mutableListOf<Int>()
         var bgTag: String? = null
 
@@ -160,10 +159,10 @@ object EnhancedLrcParser : ILyricsParser {
                         end = shifted.last().end
                     ))
                 } else if (textContent.isNotBlank()) {
-                    results.add(KaraokeLine.MainKaraokeLine(
-                        syllables = listOf(KaraokeSyllable(textContent, startTime, startTime)),
+                    // For typical lines without enhanced syllable parts
+                    results.add(SyncedLine(
+                        content = textContent,
                         translation = null,
-                        alignment = alignment,
                         start = startTime,
                         end = startTime
                     ))
@@ -207,30 +206,41 @@ object EnhancedLrcParser : ILyricsParser {
         return list
     }
 
-    private fun List<KaraokeLine>.combineRawWithTranslation(): List<KaraokeLine> {
-        val list = ArrayList<KaraokeLine>()
+    private fun List<ISyncedLine>.combineRawWithTranslation(): List<ISyncedLine> {
+        val list = ArrayList<ISyncedLine>()
         val usedIndices = mutableSetOf<Int>()
 
         for (i in this.indices) {
             if (i in usedIndices) continue
             val line = this[i]
-            val content = line.syllables.joinToString("") { it.content }.trim()
+            val contentStr = when (line) {
+                is KaraokeLine -> line.syllables.joinToString("") { it.content }.trim()
+                is SyncedLine -> line.content.trim()
+                else -> ""
+            }
 
             var translationFound = false
             for (j in i + 1 until this.size) {
                 if (j in usedIndices) continue
                 val nextLine = this[j]
 
-                // 兼容逻辑：类型相同，或者当 AccompanimentLine 的翻译未带 bg 标签而被识别为 MainLine 时
+                // 兼容逻辑：类型相同，或者当 AccompanimentLine 的翻译未带 bg 标签而被识别为 MainLine 或 SyncedLine 时
                 val isCompatibleType = (line::class == nextLine::class) ||
-                        (line is KaraokeLine.AccompanimentKaraokeLine && nextLine is KaraokeLine.MainKaraokeLine)
+                        (line is KaraokeLine.AccompanimentKaraokeLine && nextLine is KaraokeLine.MainKaraokeLine) ||
+                        nextLine is SyncedLine
 
                 if (isCompatibleType && abs(line.start - nextLine.start) <= 150) {
-                    val nextContent = nextLine.syllables.joinToString("") { it.content }.trim()
-                    if (content != nextContent && content.isNotEmpty()) {
+                    val nextContent = when (nextLine) {
+                        is KaraokeLine -> nextLine.syllables.joinToString("") { it.content }.trim()
+                        is SyncedLine -> nextLine.content.trim()
+                        else -> ""
+                    }
+                    if (contentStr != nextContent && contentStr.isNotEmpty()) {
                         val updated = when (line) {
                             is KaraokeLine.MainKaraokeLine -> line.copy(translation = nextContent)
                             is KaraokeLine.AccompanimentKaraokeLine -> line.copy(translation = nextContent)
+                            is SyncedLine -> line.copy(translation = nextContent)
+                            else -> line
                         }
                         list.add(updated)
                         usedIndices.add(i)
@@ -249,15 +259,28 @@ object EnhancedLrcParser : ILyricsParser {
         return list
     }
 
-    private fun List<KaraokeLine>.rearrangeAccompanimentAlignment(): List<KaraokeLine> {
+    private fun List<ISyncedLine>.rearrangeAccompanimentAlignment(): List<ISyncedLine> {
         var lastAlignment = KaraokeAlignment.Unspecified
         return this.map { line ->
             if (line is KaraokeLine.AccompanimentKaraokeLine) {
                 if (line.alignment == lastAlignment) line else line.copy(alignment = lastAlignment)
-            } else {
+            } else if (line is KaraokeLine) {
                 lastAlignment = line.alignment
+                line
+            } else {
+                lastAlignment = KaraokeAlignment.Unspecified
                 line
             }
         }
     }
+
+    private fun List<ISyncedLine>.rearrangeUncheckedLineTime(): List<ISyncedLine> =
+        this.mapIndexed { index, line ->
+            if (line is SyncedLine) {
+                val end = this.getOrNull(index + 1)?.start ?: Int.MAX_VALUE
+                line.copy(end = end)
+            } else {
+                line
+            }
+        }
 }
