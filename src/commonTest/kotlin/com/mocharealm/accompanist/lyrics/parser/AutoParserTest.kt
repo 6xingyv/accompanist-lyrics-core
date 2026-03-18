@@ -1,16 +1,11 @@
 package com.mocharealm.accompanist.lyrics.parser
 
-import com.mocharealm.accompanist.lyrics.core.model.SyncedLyrics
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeAlignment
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine
 import com.mocharealm.accompanist.lyrics.core.model.synced.SyncedLine
 import com.mocharealm.accompanist.lyrics.core.parser.AutoParser
-import com.mocharealm.accompanist.lyrics.core.parser.ILyricsParser
-import com.mocharealm.accompanist.lyrics.core.utils.LyricsFormatGuesser
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class AutoParserTest {
@@ -24,7 +19,7 @@ class AutoParserTest {
             [00:25.50]You're on my mind
             [00:31.38]Sometimes I still wake up thinking you're by my side
         """.trimIndent()
-        val result = AutoParser.Builder().build().parse(lrc)
+        val result = AutoParser().parse(lrc)
         assertTrue {
             result.lines.isNotEmpty() && result.lines.all { it is SyncedLine }
         }
@@ -42,7 +37,7 @@ class AutoParserTest {
             "[00:33.940]<00:33.940>背景音<00:34.500>"
         )
 
-        val data = AutoParser.Builder().build().parse(enhancedLrc)
+        val data = AutoParser().parse(enhancedLrc)
 
         assertEquals(2, data.lines.size)
 
@@ -73,7 +68,7 @@ class AutoParserTest {
                 </div></body>
             </tt>
         """.trimIndent()
-        val result = AutoParser.Builder().build().parse(ttml)
+        val result = AutoParser().parse(ttml)
         assertEquals(1, result.lines.size)
         assertEquals(2, (result.lines[0] as KaraokeLine).syllables.size)
     }
@@ -82,7 +77,7 @@ class AutoParserTest {
     fun testParseLyricifySyllable() {
         val lys =
             "[4]I (0,214)promise (214,345)that (559,185)you'll (744,154)never (898,334)find (1232,202)another (1434,470)like (1904,363)me(2267,658)"
-        val result = AutoParser.Builder().build().parse(lys)
+        val result = AutoParser().parse(lys)
         assertEquals(1, result.lines.size)
         assertEquals(9, (result.lines[0] as KaraokeLine).syllables.size)
     }
@@ -90,43 +85,13 @@ class AutoParserTest {
     @Test
     fun testParseUnknownFormat() {
         val unknown = "just some random text"
-        val result = AutoParser.Builder().build().parse(unknown)
+        val result = AutoParser().parse(unknown)
         assertEquals(0, result.lines.size)
     }
 
-    @Test
-    fun testCustomFormatRegistration() {
-        val customFormat = LyricsFormatGuesser.LyricsFormat(
-            name = "CUSTOM",
-            detector = { it.startsWith("CUSTOM_LYRICS:") }
-        )
-
-        val parser = AutoParser.Builder().withFormat(customFormat, object : ILyricsParser {
-            override fun parse(lines: List<String>): SyncedLyrics {
-                return SyncedLyrics(
-                    lines = listOf(
-                        KaraokeLine.MainKaraokeLine(
-                            syllables = listOf(),
-                            translation = null,
-                            alignment = KaraokeAlignment.Start,
-                            start = 0,
-                            end = 1000
-                        )
-                    )
-                )
-            }
-        }).build()
-
-        // 3. Test parsing with the custom format
-        val customLyrics = "CUSTOM_LYRICS: This is a commonTest."
-        val result = parser.parse(customLyrics)
-
-        assertEquals(1, result.lines.size)
-        assertNotNull(result.lines.find { it is KaraokeLine })
-    }
 
     @Test
-    fun testParseKugouKrc(){
+    fun testParseKugouKrc() {
         val krc = """
 [id:$00000000]
 [ar:三Z-STUDIO/HOYO-MiX]
@@ -240,7 +205,7 @@ class AutoParserTest {
 [234030,2612]<0,2612,0>RUN
 [237242,3001]<0,209,0>We're <209,327,0>gonna <536,352,0>make <888,361,0>it <1249,448,0>out <1697,400,0>my <2097,592,0>friend
         """.trimIndent()
-        val result = AutoParser.Builder().build().parse(krc)
+        val result = AutoParser().parse(krc)
         // 验证解析出的行数 (100行主歌词和翻译)
         assertEquals(100, result.lines.size)
 
@@ -256,15 +221,15 @@ class AutoParserTest {
         assertEquals("抵抗多久？", tenLine.translation?.trim())
 
         // 验证第九行是否解析正确
-        assertEquals("How ",nineLine.syllables[0].content)
+        assertEquals("How ", nineLine.syllables[0].content)
 
         // 验证第十行是否解析正确
-        assertEquals("Can ",tenLine.syllables[0].content)
+        assertEquals("Can ", tenLine.syllables[0].content)
 
         // 验证九十九行翻译
-        assertEquals("我们终将走出迷惘",jiuShiJiuLine.translation?.trim())
+        assertEquals("我们终将走出迷惘", jiuShiJiuLine.translation?.trim())
 
         //验证九十九行第三个
-        assertEquals("make ",jiuShiJiuLine.syllables[2].content)
+        assertEquals("make ", jiuShiJiuLine.syllables[2].content)
     }
 }

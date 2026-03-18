@@ -11,6 +11,8 @@ import com.mocharealm.accompanist.lyrics.core.utils.parseAsTime
  * It uses a regular expression to match the LRC line format: `[mm:ss.xx]Lyric content` or `[mm:ss.xxx]Lyric content`.
  */
 object LrcParser : ILyricsParser {
+    private val regex = """\[\d{2}:\d{2}\.\d{2,3}\].+""".toRegex()
+    override fun canParse(content: String): Boolean = content.contains(regex)
     private val timestampRegex = Regex("""\[(?:(\d{1,2}):)?(\d{1,2}:\d{1,2}\.\d{2,3})\]""")
 
     override fun parse(lines: List<String>): SyncedLyrics {

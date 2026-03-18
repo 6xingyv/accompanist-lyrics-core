@@ -21,6 +21,15 @@ import kotlin.math.abs
  * ```
  */
 object EnhancedLrcParser : ILyricsParser {
+    override fun canParse(content: String): Boolean {
+        val hasVoiceTag = content.contains("""\]v[a-zA-Z0-9]+:""".toRegex())
+        val hasLineTimestamp = content.contains("""\[\d{2}:\d{2}\.\d{2,3}\]""".toRegex())
+        val hasInlineTimestamp = content.contains("""<\d{2}:\d{2}\.\d{2,3}>""".toRegex())
+
+        val hasBothTimestamps = hasLineTimestamp && hasInlineTimestamp
+
+        return hasVoiceTag || hasBothTimestamps
+    }
     private val voiceParser = Regex("^(v\\d+)\\s*:\\s*(.*)")
     private val tagRegex = Regex("""\[(.*?)\]""")
     private val timestampPattern = Regex("""\d+([:.]\d+)+""")

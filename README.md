@@ -52,13 +52,11 @@ dependencies {
 For most use cases, `AutoParser` is the easiest way to parse lyrics without needing to know the format beforehand.
 
 ```kotlin
-import com.mocharealm.accompanist.lyrics.core.parser.AutoParser
-
 // 1. Get your lyrics content from a file or network
 val lyricsContent: String = fetchLyrics()
 
-// 2. Create a default AutoParser instance using its builder
-val autoParser = AutoParser.Builder().build()
+// 2. Create a default AutoParser instance
+val autoParser = AutoParser()
 
 // 3. Parse the content
 val lyrics = autoParser.parse(lyricsContent)
@@ -73,7 +71,6 @@ println(lyrics.lines.first().text)
 If you know the exact format, you can use a specific parser directly.
 
 ```kotlin
-import com.mocharealm.accompanist.lyrics.core.parser.LrcParser
 
 val lrcLines = listOf(
     "[00:39.96]I lean in and you move away",
@@ -97,55 +94,46 @@ Accompanist Lyrics is designed to be extensible. You can add support for any cus
 Create a class that implements the parsing logic for your custom format.
 
 ```kotlin
-import com.mocharealm.accompanist.lyrics.core.model.SyncedLyrics
-import com.mocharealm.accompanist.lyrics.core.parser.ILyricsParser
-
 class MyCustomParser : ILyricsParser {
+    override fun canParse(content: String): Boolean {
+        // Check if your parser can parse or not
+        // Example: check for a unique tag
+        return content.startsWith("##MY_COOL_LYRICS##")
+    }
+
     override fun parse(lines: List<String>): SyncedLyrics {
         // Your parsing logic here...
     }
-    
+
     override fun parse(content: String): SyncedLyrics {
         // Your parsing logic here...
     }
 }
 ```
 
-### Step 2: Define a Format Detector
+### Step 2: Register with `AutoParser`
 
-Create a `LyricsFormat` that contains a detector function. This function returns `true` if the given content matches your custom format.
+Pass your custom parser to the `AutoParser` constructor. Custom formats are checked in the order they are provided in the list, ensuring they are prioritized over built-in ones if placed first.
 
 ```kotlin
-import com.mocharealm.accompanist.lyrics.core.utils.LyricsFormatGuesser
-
-val myCustomFormat = LyricsFormatGuesser.LyricsFormat(
-    name = "MY_CUSTOM_FORMAT",
-    detector = { content -> 
-        // Example: check for a unique tag
-        content.startsWith("##MY_COOL_LYRICS##")
-    }
+// Build an AutoParser instance with your custom parser alongside built-in ones
+val autoParser = AutoParser(
+    listOf(
+        MyCustomParser(), // Checked first
+        KugouKrcParser,
+        TTMLParser,
+        LyricifySyllableParser,
+        EnhancedLrcParser,
+        LrcParser
+    )
 )
-```
-
-### Step 3: Register with `AutoParser.Builder`
-
-Use the `withFormat` method on the builder to register your new format and its parser. Custom formats are checked first, ensuring they are prioritized over built-in ones.
-
-```kotlin
-import com.mocharealm.accompanist.lyrics.core.parser.AutoParser
-
-// Build an AutoParser instance with your custom format
-val autoParser = AutoParser.Builder()
-    .withFormat(myCustomFormat, MyCustomParser())
-    .build()
 
 // This parser now understands both built-in and your custom format!
 val lyrics = autoParser.parse(myCustomLyricsContent)
 ```
-
 ## 💬 Community & Support
 
-Join the community, ask questions, and share your projects\!
+Join the community, ask questions, and share your projects!
 
 - **Telegram:** [**mocha\_pot**](https://t.me/mocha_pot)
 - **GitHub Issues:** [**Create an Issue**](https://www.google.com/search?q=https://github.com/6xingyv/Accompanist-Lyrics/issues)

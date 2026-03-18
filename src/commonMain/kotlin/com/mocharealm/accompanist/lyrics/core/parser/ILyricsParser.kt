@@ -4,6 +4,11 @@ import com.mocharealm.accompanist.lyrics.core.model.SyncedLyrics
 
 interface ILyricsParser {
     /**
+     * Determine if the parser can parse the lyrics.
+     */
+    fun canParse(content: String): Boolean
+
+    /**
      * Parses a list of strings into SyncedLyrics.
      * Has a default implementation that joins the list and calls the String version of parse.
      *

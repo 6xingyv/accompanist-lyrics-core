@@ -13,9 +13,15 @@ import com.mocharealm.accompanist.lyrics.core.utils.isDigitsOnly
  * More information about Lyricify Syllable format can be found [here](https://github.com/WXRIW/Lyricify-App/blob/main/docs/Lyricify%204/Lyrics.md#lyricify-syllable-%E6%A0%BC%E5%BC%8F%E8%A7%84%E8%8C%83).
  */
 object LyricifySyllableParser: ILyricsParser {
-    // 提到外部，避免重复编译正则，提高性能并增强跨平台稳定性
+    override fun canParse(content: String): Boolean {
+        val detector = """[a-zA-Z]+\s*\(\d+,\d+\)""".toRegex()
+        return content.contains(detector)
+    }
+
     private val syllableRegex = Regex("(.*?)\\((\\d+),(\\d+)\\)")
     private val attributeRegex = Regex("\\[(\\d+)\\]")
+
+
 
     override fun parse(lines: List<String>): SyncedLyrics {
         val lyricsLines = LrcMetadataHelper.removeAttributes(lines)

@@ -7,6 +7,17 @@ import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeSyllable
 import com.mocharealm.accompanist.lyrics.core.utils.KugouKrcMetadataDecoder
 
 object KugouKrcParser : ILyricsParser {
+    override fun canParse(content: String): Boolean {
+        val lineTimeRegex = """^\[\d+,\d+\]""".toRegex()
+        val wordTimeRegex = """<\d+,\d+,\d+>.{1}""".toRegex()
+
+        return content.lineSequence()
+            .map { it.trim() }
+            .any { line ->
+                lineTimeRegex.containsMatchIn(line) && wordTimeRegex.containsMatchIn(line)
+            }
+    }
+
     private val KRC_LINE_REGEX = Regex("""^\[(\d+),(\d+)\](.*)$""")
     private val SYLLABLE_REGEX = Regex("""<(\d+),(\d+),\d+>""")
     private val BG_LINE_REGEX = Regex("""^\[bg:(.*)\](.*)$""")
@@ -37,7 +48,8 @@ object KugouKrcParser : ILyricsParser {
                         val last = resultLines.last()
                         if (last is KaraokeLine.MainKaraokeLine) {
                             resultLines[resultLines.size - 1] = last.copy(
-                                accompanimentLines = (last.accompanimentLines ?: emptyList()) + bgLine
+                                accompanimentLines = (last.accompanimentLines
+                                    ?: emptyList()) + bgLine
                             )
                         } else {
                             resultLines.add(bgLine)
@@ -60,12 +72,17 @@ object KugouKrcParser : ILyricsParser {
             val contentPart = match.groupValues[3]
             val rawSyllables = parseSyllablesAndMergeColons(contentPart, lineStart)
 
-            val syllablesWithPhonetics = injectPhonetics(rawSyllables, metadata.phonetics, lyricLineIndex)
+            val syllablesWithPhonetics =
+                injectPhonetics(rawSyllables, metadata.phonetics, lyricLineIndex)
 
-            val (alignment, finalSyllables, nextState) = determineRole(syllablesWithPhonetics, currentRoleState)
+            val (alignment, finalSyllables, nextState) = determineRole(
+                syllablesWithPhonetics,
+                currentRoleState
+            )
             currentRoleState = nextState
 
-            val translation = metadata.translations.getOrNull(lyricLineIndex)?.takeIf { it.isNotBlank() }
+            val translation =
+                metadata.translations.getOrNull(lyricLineIndex)?.takeIf { it.isNotBlank() }
 
             if (finalSyllables.isNotEmpty()) {
                 resultLines.add(
@@ -112,8 +129,12 @@ object KugouKrcParser : ILyricsParser {
         }
     }
 
-    private fun parseSyllablesAndMergeColons(content: String, baseStartTime: Int): List<KaraokeSyllable> {
+    private fun parseSyllablesAndMergeColons(
+        content: String,
+        baseStartTime: Int
+    ): List<KaraokeSyllable> {
         data class TempToken(val offset: Int, val duration: Int, val text: String)
+
         val tokens = mutableListOf<TempToken>()
 
         var cursor = 0
@@ -160,14 +181,19 @@ object KugouKrcParser : ILyricsParser {
         syllables: List<KaraokeSyllable>,
         currentState: KaraokeAlignment
     ): Triple<KaraokeAlignment, List<KaraokeSyllable>, KaraokeAlignment> {
-        if (syllables.isEmpty()) return Triple(KaraokeAlignment.Unspecified, syllables, currentState)
+        if (syllables.isEmpty()) return Triple(
+            KaraokeAlignment.Unspecified,
+            syllables,
+            currentState
+        )
 
         val rawText = syllables.joinToString("") { it.content }
         val hasMarker = rawText.startsWith("：") || rawText.startsWith(":") ||
                 rawText.endsWith("：") || rawText.endsWith(":")
 
         if (hasMarker) {
-            val newState = if (currentState == KaraokeAlignment.Start) KaraokeAlignment.End else KaraokeAlignment.Start
+            val newState =
+                if (currentState == KaraokeAlignment.Start) KaraokeAlignment.End else KaraokeAlignment.Start
             return Triple(newState, syllables, newState)
         }
 

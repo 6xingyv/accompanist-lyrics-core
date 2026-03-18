@@ -15,6 +15,9 @@ import kotlin.collections.get
  * More information about TTML(Apple Syllable) format can be found [here](https://help.apple.com/itc/videoaudioassetguide/#/itc0f14fecdd).
  */
 object TTMLParser : ILyricsParser {
+    override fun canParse(content: String): Boolean =
+        content.contains("http://www.w3.org/ns/ttml")
+
     override fun parse(lines: List<String>): SyncedLyrics {
         return parse(lines.joinToString("") { it.trimIndent() })
     }
