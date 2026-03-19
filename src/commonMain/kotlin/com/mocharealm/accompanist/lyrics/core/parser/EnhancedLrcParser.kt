@@ -16,18 +16,24 @@ import kotlin.math.abs
  * Enhanced LRC extends the standard LRC format with support for syllable-level timing (Karaoke),
  * multiple singers/voices, and background vocals.
  *
- * Example format:
+ * Recommended format:
  * ```
  * [00:12.34]<00:12.34>Hel<00:12.60>lo <00:12.90>World
  * [bg:<00:12.34>Back<00:12.60>ground<00:12.90>]
  * ```
+ *
+ * Also supports bad karaoke format with [] brackets:
+ * ```
+ * [00:12.34][00:12.34]Hel[00:12.60]lo [00:12.90]World
+ * [bg:[00:12.34]Back[00:12.60]ground[00:12.90]]
+ * ```
  */
 object EnhancedLrcParser : ILyricsParser {
     override fun canParse(content: String): Boolean {
-        // 只要有一层符合 LRC 的括号，即可处理，无论是纯文本、译文还是包含 karaoke 标签
         val hasLineTimestamp = content.contains("""\[\d{2}:\d{2}\.\d{2,3}\]""".toRegex())
         return hasLineTimestamp
     }
+
     private val voiceParser = Regex("^(v\\d+)\\s*:\\s*(.*)")
     private val tagRegex = Regex("""\[(.*?)\]""")
     private val timestampPattern = Regex("""\d+([:.]\d+)+""")
@@ -36,11 +42,16 @@ object EnhancedLrcParser : ILyricsParser {
         return timestampPattern.matches(s.trim())
     }
 
-    private fun proceduralParseSyllables(content: String): List<KaraokeSyllable> {
+    private fun proceduralParseSyllables(content: String, bracketType: BracketType = BracketType.ANGLE): List<KaraokeSyllable> {
         if (content.isBlank()) return emptyList()
 
         val syllables = mutableListOf<KaraokeSyllable>()
-        val syllableRegex = Regex("""<([^>]+)>([^<]*)""")
+
+        val syllableRegex = when (bracketType) {
+            BracketType.ANGLE -> Regex("""<([^>]+)>([^<]*)""")
+            BracketType.SQUARE -> Regex("""\[([^\]]+)\]([^\[]*)""")
+        }
+
         val matches = syllableRegex.findAll(content).toList()
 
         for (match in matches) {
@@ -129,9 +140,12 @@ object EnhancedLrcParser : ILyricsParser {
             }
         }
 
-        val bgSyllables = bgTag?.let { proceduralParseSyllables(it) } ?: emptyList()
+        // 检测内容中使用的括号类型
+        val bracketType = detectBracketType(content, bgTag)
+
+        val bgSyllables = bgTag?.let { proceduralParseSyllables(it, bracketType) } ?: emptyList()
         val mainSyllables = if (timestamps.isNotEmpty() && content.isNotBlank()) {
-            proceduralParseSyllables(content)
+            proceduralParseSyllables(content, bracketType)
         } else emptyList()
 
         val voiceMatch = voiceParser.find(content)
@@ -191,6 +205,34 @@ object EnhancedLrcParser : ILyricsParser {
         }
 
         return results
+    }
+
+    /**
+     * 检测内容中使用的括号类型
+     */
+    private fun detectBracketType(content: String?, bgTag: String?): BracketType {
+        // 检查主内容
+        if (content != null) {
+            if (content.contains(Regex("<\\d+"))) {
+                return BracketType.ANGLE
+            }
+            if (content.contains(Regex("\\[\\d+"))) {
+                return BracketType.SQUARE
+            }
+        }
+
+        // 检查bg标签
+        if (bgTag != null) {
+            if (bgTag.contains(Regex("<\\d+"))) {
+                return BracketType.ANGLE
+            }
+            if (bgTag.contains(Regex("\\[\\d+"))) {
+                return BracketType.SQUARE
+            }
+        }
+
+        // 默认使用尖括号
+        return BracketType.ANGLE
     }
 
     private fun List<KaraokeSyllable>.rearrangeTime(): List<KaraokeSyllable> {
@@ -283,4 +325,9 @@ object EnhancedLrcParser : ILyricsParser {
                 line
             }
         }
+
+    private enum class BracketType {
+        ANGLE,    // < >
+        SQUARE    // [ ]
+    }
 }
