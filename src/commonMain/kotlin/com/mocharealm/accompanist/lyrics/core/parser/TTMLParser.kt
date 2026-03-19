@@ -213,26 +213,25 @@ class TTMLParser(
     private fun applyFallbackPhonetics(syncedLyrics: SyncedLyrics): SyncedLyrics {
         val provider = fallbackPhoneticProvider ?: return syncedLyrics
         val processedLines = syncedLyrics.lines.map { line ->
-            return@map when (line) {
-                is KaraokeLine -> {
-                    when (provider.phoneticLevel) {
-                        PhoneticLevel.LINE -> {
-                            if (line.phonetic.isNullOrBlank()) {
-                                 line.copy(phonetic = provider.getPhonetic(line.syllables.contentToString()))
-                            } else line
-                        }
+            if (line !is KaraokeLine) return@map line
 
-                        PhoneticLevel.SYLLABLE -> {
-                            val newSyllables = line.syllables.map { syllable ->
-                                if (syllable.phonetic.isNullOrBlank()) {
-                                    syllable.copy(phonetic = provider.getPhonetic(syllable.content))
-                                } else syllable
-                            }
-                            line.copy(syllables = newSyllables)
-                        }
-                    }
+            // 如果当前行已有任何形式的发音（行级或音节级），则不进行 fallback
+            val hasExistingPhonetic = !line.phonetic.isNullOrBlank() ||
+                    line.syllables.any { !it.phonetic.isNullOrBlank() }
+
+            if (hasExistingPhonetic) return@map line
+
+            return@map when (provider.phoneticLevel) {
+                PhoneticLevel.LINE -> {
+                    line.copy(phonetic = provider.getPhonetic(line.syllables.contentToString()))
                 }
-                else -> line
+
+                PhoneticLevel.SYLLABLE -> {
+                    val newSyllables = line.syllables.map { syllable ->
+                        syllable.copy(phonetic = provider.getPhonetic(syllable.content))
+                    }
+                    line.copy(syllables = newSyllables)
+                }
             }
         }
 

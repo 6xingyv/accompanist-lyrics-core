@@ -2,11 +2,77 @@ package com.mocharealm.accompanist.lyrics.core.parser
 
 import com.mocharealm.accompanist.lyrics.core.exporter.TTMLExporter
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine
+import com.mocharealm.accompanist.lyrics.core.model.karaoke.PhoneticLevel
+import com.mocharealm.accompanist.lyrics.core.utils.PhoneticProvider
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
 class TTMLParserTest {
+
+    @Test
+    fun testNoFallbackWhenPhoneticExists() {
+        val ttml = """
+            <tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata">
+                <body><div>
+                    <p begin="00:00.000" end="00:01.000">
+                        <span begin="00:00.000" end="00:01.000">Hello</span>
+                        <span ttm:role="x-roman">Existing Phonetic</span>
+                    </p>
+                </div></body>
+            </tt>
+        """.trimIndent()
+
+        val provider = object : PhoneticProvider {
+            override val phoneticLevel: PhoneticLevel = PhoneticLevel.SYLLABLE
+            override fun getPhonetic(content: String): String = "Fallback"
+        }
+
+        val result = TTMLParser(provider).parse(ttml)
+        val line = result.lines[0] as KaraokeLine.MainKaraokeLine
+
+        // Should keep existing line phonetic and NOT apply fallback to syllables
+        assertEquals("Existing Phonetic", line.phonetic)
+        assertEquals(null, line.syllables[0].phonetic)
+    }
+
+    @Test
+    fun testNoFallbackWhenSyllablePhoneticExists() {
+        val ttml = """
+            <tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata" xmlns:itunes="http://music.apple.com/lyric-ttml-internal">
+                <head>
+                    <metadata>
+                        <iTunesMetadata xmlns="http://music.apple.com/lyric-ttml-internal">
+                            <transliterations>
+                                <transliteration>
+                                    <text for="L1">
+                                        <span begin="00:00.000" end="00:00.000">SyllablePhonetic</span>
+                                    </text>
+                                </transliteration>
+                            </transliterations>
+                        </iTunesMetadata>
+                    </metadata>
+                </head>
+                <body><div>
+                    <p begin="00:00.000" end="00:01.000" itunes:key="L1">
+                        <span begin="00:00.000" end="00:01.000">Hello</span>
+                    </p>
+                </div></body>
+            </tt>
+        """.trimIndent()
+
+        val provider = object : PhoneticProvider {
+            override val phoneticLevel: PhoneticLevel = PhoneticLevel.LINE
+            override fun getPhonetic(content: String): String = "Fallback"
+        }
+
+        val result = TTMLParser(provider).parse(ttml)
+        val line = result.lines[0] as KaraokeLine.MainKaraokeLine
+
+        // Should keep existing syllable phonetic and NOT apply fallback to line
+        assertEquals("SyllablePhonetic", line.syllables[0].phonetic)
+        assertEquals(null, line.phonetic)
+    }
 
     @Test
     fun testBgPositioning() {
