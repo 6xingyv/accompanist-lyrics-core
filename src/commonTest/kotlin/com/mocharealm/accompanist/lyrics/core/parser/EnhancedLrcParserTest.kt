@@ -1,7 +1,7 @@
 package com.mocharealm.accompanist.lyrics.core.parser
 
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine
-import com.mocharealm.accompanist.lyrics.core.exporter.LrcExporter
+import com.mocharealm.accompanist.lyrics.core.exporter.EnhancedLrcExporter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -40,7 +40,7 @@ class EnhancedLrcParserTest {
         """.trimIndent().split("\n")
         
         val parsed = EnhancedLrcParser.parse(lrc)
-        val exported = LrcExporter.export(parsed)
+        val exported = EnhancedLrcExporter.export(parsed)
         
         val reParsed = EnhancedLrcParser.parse(exported.split("\n"))
         

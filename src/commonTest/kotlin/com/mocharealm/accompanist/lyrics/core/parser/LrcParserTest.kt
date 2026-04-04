@@ -1,7 +1,7 @@
 package com.mocharealm.accompanist.lyrics.core.parser
 
 import com.mocharealm.accompanist.lyrics.core.model.synced.SyncedLine
-import com.mocharealm.accompanist.lyrics.core.exporter.LrcExporter
+import com.mocharealm.accompanist.lyrics.core.exporter.EnhancedLrcExporter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -36,7 +36,7 @@ class LrcParserTest {
         """.trimIndent()
 
         val parsed = EnhancedLrcParser.parse(original.split("\n"))
-        val exported = LrcExporter.export(parsed)
+        val exported = EnhancedLrcExporter.export(parsed)
 
         val reParsed = EnhancedLrcParser.parse(exported.split("\n"))
 
