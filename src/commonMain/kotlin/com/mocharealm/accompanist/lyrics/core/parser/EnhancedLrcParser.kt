@@ -6,6 +6,7 @@ import com.mocharealm.accompanist.lyrics.core.model.synced.SyncedLine
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeAlignment
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeSyllable
+import com.mocharealm.accompanist.lyrics.core.model.karaoke.mapper.contentToString
 import com.mocharealm.accompanist.lyrics.core.utils.LrcMetadataHelper
 import com.mocharealm.accompanist.lyrics.core.utils.parseAsTime
 import kotlin.math.abs
@@ -256,7 +257,7 @@ object EnhancedLrcParser : ILyricsParser {
             if (i in usedIndices) continue
             val line = this[i]
             val contentStr = when (line) {
-                is KaraokeLine -> line.syllables.joinToString("") { it.content }.trim()
+                is KaraokeLine -> line.syllables.contentToString().trim()
                 is SyncedLine -> line.content.trim()
                 else -> ""
             }
@@ -273,7 +274,7 @@ object EnhancedLrcParser : ILyricsParser {
 
                 if (isCompatibleType && abs(line.start - nextLine.start) <= 150) {
                     val nextContent = when (nextLine) {
-                        is KaraokeLine -> nextLine.syllables.joinToString("") { it.content }.trim()
+                        is KaraokeLine -> nextLine.syllables.contentToString().trim()
                         is SyncedLine -> nextLine.content.trim()
                         else -> ""
                     }
