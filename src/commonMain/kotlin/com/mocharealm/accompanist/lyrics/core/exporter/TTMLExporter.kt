@@ -4,6 +4,7 @@ import com.mocharealm.accompanist.lyrics.core.model.SyncedLyrics
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeAlignment
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeSyllable
+import com.mocharealm.accompanist.lyrics.core.model.synced.SyncedLine
 import com.mocharealm.accompanist.lyrics.core.utils.toTimeFormattedString
 
 object TTMLExporter : ILyricsExporter {
@@ -52,9 +53,10 @@ object TTMLExporter : ILyricsExporter {
         val firstLineTime = lyrics.lines.first().start
         builder.appendLine("""    <div begin="${firstLineTime.toTimeFormattedString()}" end="${totalDuration.toTimeFormattedString()}">""")
 
-        lyrics.lines.filterIsInstance<KaraokeLine>().forEach { line ->
-            if (line is KaraokeLine.MainKaraokeLine) {
-                appendPElement(builder, line)
+        lyrics.lines.forEach { line ->
+            when (line) {
+                is KaraokeLine.MainKaraokeLine -> appendPElement(builder, line)
+                is SyncedLine -> appendPElement(builder, line)
             }
         }
 
@@ -99,6 +101,28 @@ object TTMLExporter : ILyricsExporter {
             builder.append("""<span ttm:role="x-bg" begin="${bgLine.start.toTimeFormattedString()}" end="${bgLine.end.toTimeFormattedString()}">""")
             buildContent(bgLine.syllables, bgLine.translation)
             builder.append("""</span>""")
+        }
+        
+        builder.appendLine("</p>")
+    }
+
+    private fun appendPElement(builder: StringBuilder, line: SyncedLine) {
+        val pTag = """<p begin="${line.start.toTimeFormattedString()}" end="${line.end.toTimeFormattedString()}">"""
+        builder.append("      $pTag")
+
+        val escapedContent = line.content
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            
+        builder.append(escapedContent)
+
+        if (line.translation != null) {
+            val escapedTranslation = line.translation
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+            builder.append("""<span ttm:role="x-translation" xml:lang="zh-CN">${escapedTranslation.trim()}</span>""")
         }
         
         builder.appendLine("</p>")
