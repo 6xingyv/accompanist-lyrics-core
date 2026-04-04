@@ -1,5 +1,6 @@
 package com.mocharealm.accompanist.lyrics.core.parser
 
+import com.mocharealm.accompanist.lyrics.core.model.ISyncedLine
 import com.mocharealm.accompanist.lyrics.core.model.SyncedLyrics
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeAlignment
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine
@@ -78,12 +79,23 @@ class TTMLParser(
         return applyFallbackPhonetics(syncedLyrics)
     }
 
+    private fun extractAllText(element: XmlElement): String {
+        val sb = StringBuilder()
+        sb.append(element.text)
+        for (child in element.children) {
+            // we don't extract from translation or ruby spans if they are just metadata, but for safe fallback let's just extract all text that isn't translation
+            if (child.name == "span" && (child.hasRole("x-translation") || child.hasRole("x-bg") || child.hasRole("x-roman"))) continue
+            sb.append(extractAllText(child))
+        }
+        return sb.toString()
+    }
+
     private fun parseSingleLine(
         p: XmlElement,
         alignments: Map<String, KaraokeAlignment>,
         translations: Map<String, String>,
         transliterations: Map<String, List<String>>
-    ): KaraokeLine? {
+    ): ISyncedLine? {
         val start = p.attr("begin")?.parseAsTime() ?: return null
         val end = p.attr("end")?.parseAsTime() ?: return null
         val agentId = p.attr("ttm:agent")
@@ -119,7 +131,16 @@ class TTMLParser(
                 )
             }
 
-        if (syllables.isEmpty() && accompanimentLines.isEmpty()) return null
+        if (syllables.isEmpty() && accompanimentLines.isEmpty()) {
+            val content = decodeXmlEntities(extractAllText(p)).trim()
+            if (content.isEmpty()) return null
+            return SyncedLine(
+                content = content,
+                translation = inlineTranslation ?: itunesTranslationPair?.first,
+                start = start,
+                end = end
+            )
+        }
 
         return KaraokeLine.MainKaraokeLine(
             syllables = syllables,

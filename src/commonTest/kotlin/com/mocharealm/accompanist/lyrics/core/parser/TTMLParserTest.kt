@@ -3,10 +3,12 @@ package com.mocharealm.accompanist.lyrics.core.parser
 import com.mocharealm.accompanist.lyrics.core.exporter.TTMLExporter
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.PhoneticLevel
+import com.mocharealm.accompanist.lyrics.core.model.synced.SyncedLine
 import com.mocharealm.accompanist.lyrics.core.utils.PhoneticProvider
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class TTMLParserTest {
 
@@ -237,5 +239,45 @@ class TTMLParserTest {
             p1.accompanimentLines?.first()?.translation,
             p2.accompanimentLines?.first()?.translation
         )
+    }
+
+    @Test
+    fun testParseSyncedLineAndMixedLines() {
+        val ttml = """
+            <tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata">
+                <body><div>
+                    <p begin="00:00.000" end="00:02.000">This is a regular synced line without syllables</p>
+                    <p begin="00:02.000" end="00:05.000"><span begin="00:02.000" end="00:03.000">Ka</span><span begin="00:03.000" end="00:04.000">ra</span><span begin="00:04.000" end="00:05.000">oke</span></p>
+                    <p begin="00:05.000" end="00:07.000">Another synced line<span ttm:role="x-translation">Translation here</span></p>
+                </div></body>
+            </tt>
+        """.trimIndent()
+
+        val result = TTMLParser().parse(ttml)
+        val lines = result.lines
+
+        assertEquals(3, lines.size)
+
+        assertTrue(lines[0] is SyncedLine)
+        assertEquals("This is a regular synced line without syllables", (lines[0] as SyncedLine).content.trim())
+        assertEquals(0, lines[0].start)
+        assertEquals(2000, lines[0].end)
+
+        assertTrue(lines[1] is KaraokeLine.MainKaraokeLine)
+        val karaokeLine = lines[1] as KaraokeLine.MainKaraokeLine
+        assertEquals(3, karaokeLine.syllables.size)
+        
+        assertEquals("Ka", karaokeLine.syllables[0].content)
+        assertEquals(2000, karaokeLine.syllables[0].start)
+        
+        assertEquals("ra", karaokeLine.syllables[1].content)
+        assertEquals(3000, karaokeLine.syllables[1].start)
+        
+        assertEquals("oke", karaokeLine.syllables[2].content)
+        assertEquals(4000, karaokeLine.syllables[2].start)
+
+        assertTrue(lines[2] is SyncedLine)
+        assertEquals("Another synced line", (lines[2] as SyncedLine).content.trim())
+        assertEquals("Translation here", (lines[2] as SyncedLine).translation?.trim())
     }
 }
