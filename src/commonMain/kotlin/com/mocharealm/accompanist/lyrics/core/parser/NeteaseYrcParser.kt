@@ -17,7 +17,7 @@ import com.mocharealm.accompanist.lyrics.core.model.synced.SyncedLine
  * Those lines are ignored here because they are not part of timed karaoke data.
  */
 object NeteaseYrcParser : ILyricsParser {
-    private val lineRegex = Regex("""^\[(\d+),\s*(\d+)](.*)$""")
+    private val lineRegex = Regex("""^\[(\d+),\s*(\d+)\](.*)$""")
     private val syllableRegex = Regex("""\((\d+),\s*(\d+),\s*-?\d+\)([^()\r\n]*)""")
 
     override fun canParse(content: String): Boolean {

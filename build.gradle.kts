@@ -76,7 +76,7 @@ mavenPublishing {
 
     coordinates(group.toString(), "lyrics-core", version.toString())
 
-configure(
+    configure(
         KotlinMultiplatform(
             javadocJar = JavadocJar.Dokka("dokkaGeneratePublicationHtml"),
             sourcesJar = true
