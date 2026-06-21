@@ -19,6 +19,7 @@ class AutoParser(
         LyricifySyllableParser,
         EnhancedLrcParser,
         KugouKrcParser,
+        NeteaseYrcParser
     )
 ) : ILyricsParser {
 
