@@ -8,6 +8,7 @@ import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeSyllable
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.PhoneticLevel
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.copy
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.mapper.contentToString
+import com.mocharealm.accompanist.lyrics.core.model.karaoke.mapper.stripEnclosingParentheses
 import com.mocharealm.accompanist.lyrics.core.model.synced.SyncedLine
 import com.mocharealm.accompanist.lyrics.core.utils.PhoneticProvider
 import com.mocharealm.accompanist.lyrics.core.utils.SimpleXmlParser
@@ -159,7 +160,8 @@ class TTMLParser(
         alignment: KaraokeAlignment?,
         translations: Map<String, String>
     ): KaraokeLine.AccompanimentKaraokeLine? {
-        val syllables = parseSyllablesFromChildren(bgSpan.children)
+        // Background vocals are commonly wrapped in parentheses as a marker; drop them.
+        val syllables = parseSyllablesFromChildren(bgSpan.children).stripEnclosingParentheses()
         if (syllables.isEmpty()) return null
 
         val bgKey = bgSpan.attr("itunes:key", "key") ?: parentKey

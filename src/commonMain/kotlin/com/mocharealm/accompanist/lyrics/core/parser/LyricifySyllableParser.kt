@@ -4,6 +4,7 @@ import com.mocharealm.accompanist.lyrics.core.model.SyncedLyrics
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeAlignment
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeSyllable
+import com.mocharealm.accompanist.lyrics.core.model.karaoke.mapper.stripEnclosingParentheses
 import com.mocharealm.accompanist.lyrics.core.utils.LrcMetadataHelper
 import com.mocharealm.accompanist.lyrics.core.utils.isDigitsOnly
 
@@ -89,7 +90,10 @@ object LyricifySyllableParser: ILyricsParser {
         val endTime = syllables.lastOrNull()?.end ?: 0
 
         return if (isAccompaniment) {
-            KaraokeLine.AccompanimentKaraokeLine(syllables, null, alignment, startTime, endTime)
+            // Background vocals are wrapped in parentheses as a marker; drop them.
+            KaraokeLine.AccompanimentKaraokeLine(
+                syllables.stripEnclosingParentheses(), null, alignment, startTime, endTime
+            )
         } else {
             KaraokeLine.MainKaraokeLine(syllables, null, alignment, startTime, endTime)
         }

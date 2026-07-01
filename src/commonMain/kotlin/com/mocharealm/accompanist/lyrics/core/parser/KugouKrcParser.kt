@@ -4,6 +4,7 @@ import com.mocharealm.accompanist.lyrics.core.model.SyncedLyrics
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeAlignment
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeSyllable
+import com.mocharealm.accompanist.lyrics.core.model.karaoke.mapper.stripEnclosingParentheses
 import com.mocharealm.accompanist.lyrics.core.utils.KugouKrcMetadataDecoder
 
 object KugouKrcParser : ILyricsParser {
@@ -104,7 +105,8 @@ object KugouKrcParser : ILyricsParser {
     private fun parseBackgroundLine(line: String): KaraokeLine.AccompanimentKaraokeLine? {
         val m = BG_LINE_REGEX.find(line) ?: return null
         val content = m.groupValues[1]
-        val syllables = parseSyllablesAndMergeColons(content, 0)
+        // Background vocals may be wrapped in parentheses as a marker; drop them.
+        val syllables = parseSyllablesAndMergeColons(content, 0).stripEnclosingParentheses()
         if (syllables.isEmpty()) return null
 
         return KaraokeLine.AccompanimentKaraokeLine(

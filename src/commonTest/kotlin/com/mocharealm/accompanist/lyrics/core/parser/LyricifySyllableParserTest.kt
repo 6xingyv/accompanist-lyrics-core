@@ -125,4 +125,29 @@ class LyricifySyllableParserTest {
         assertTrue(data.lines[0] is KaraokeLine.AccompanimentKaraokeLine)
         assertTrue(data.lines[1] is KaraokeLine.AccompanimentKaraokeLine)
     }
+
+    @Test
+    fun testAccompanimentEnclosingParenthesesAreStripped() {
+        // Real me.lys shape: [7]/[8] background lines are wrapped in parentheses,
+        // sometimes spanning multiple syllables. They nest into the preceding main line.
+        val lys = listOf(
+            "[4]I (0,214)promise (214,345)me(559,441)",
+            "[7](Yeah)(600,200)",
+            "[7](And (800,100)I (900,100)want (1000,100)you, (1100,100)baby)(1200,200)"
+        )
+        val data = LyricifySyllableParser.parse(lys)
+
+        assertEquals(1, data.lines.size)
+        val main = data.lines[0] as KaraokeLine.MainKaraokeLine
+        // Main line is untouched.
+        assertEquals("I promise me", main.syllables.joinToString("") { it.content })
+
+        val bg = main.accompanimentLines!!
+        assertEquals(2, bg.size)
+        assertEquals("Yeah", bg[0].syllables.joinToString("") { it.content })
+        assertEquals("And I want you, baby", bg[1].syllables.joinToString("") { it.content })
+        // Timing is preserved even though the wrapping parens were dropped.
+        assertEquals(600, bg[0].start)
+        assertEquals(800, bg[1].start)
+    }
 }

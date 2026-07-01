@@ -103,8 +103,9 @@ class TTMLParserTest {
         val bgs = line.accompanimentLines
         assertNotNull(bgs)
         assertEquals(2, bgs.size)
-        assertEquals("(Before)", bgs[0].syllables.joinToString("") { it.content }.trim())
-        assertEquals("(After)", bgs[1].syllables.joinToString("") { it.content }.trim())
+        // The parentheses that mark background vocals are stripped on parse.
+        assertEquals("Before", bgs[0].syllables.joinToString("") { it.content }.trim())
+        assertEquals("After", bgs[1].syllables.joinToString("") { it.content }.trim())
     }
 
     @Test

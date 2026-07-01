@@ -7,6 +7,7 @@ import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeAlignment
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeSyllable
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.mapper.contentToString
+import com.mocharealm.accompanist.lyrics.core.model.karaoke.mapper.stripEnclosingParentheses
 import com.mocharealm.accompanist.lyrics.core.utils.LrcMetadataHelper
 import com.mocharealm.accompanist.lyrics.core.utils.parseAsTime
 import kotlin.math.abs
@@ -144,7 +145,10 @@ object EnhancedLrcParser : ILyricsParser {
         // 检测内容中使用的括号类型
         val bracketType = detectBracketType(content, bgTag)
 
-        val bgSyllables = bgTag?.let { proceduralParseSyllables(it, bracketType) } ?: emptyList()
+        // Background vocals may be wrapped in parentheses as a marker; drop them.
+        val bgSyllables =
+            (bgTag?.let { proceduralParseSyllables(it, bracketType) } ?: emptyList())
+                .stripEnclosingParentheses()
         val mainSyllables = if (timestamps.isNotEmpty() && content.isNotBlank()) {
             proceduralParseSyllables(content, bracketType)
         } else emptyList()
