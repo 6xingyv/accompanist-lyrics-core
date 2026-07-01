@@ -1,6 +1,7 @@
 package com.mocharealm.accompanist.lyrics.core.parser
 
 import com.mocharealm.accompanist.lyrics.core.exporter.TTMLExporter
+import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeAlignment
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.PhoneticLevel
 import com.mocharealm.accompanist.lyrics.core.model.synced.SyncedLine
@@ -280,5 +281,81 @@ class TTMLParserTest {
         assertTrue(lines[2] is SyncedLine)
         assertEquals("Another synced line", (lines[2] as SyncedLine).content.trim())
         assertEquals("Translation here", (lines[2] as SyncedLine).translation?.trim())
+    }
+
+    @Test
+    fun testAlignmentFlipsOnPersonChangeWithGroupTransparent() {
+        // Apple's model: person singers flip the side each time the person changes;
+        // a "group" agent is always on the LEFT and is transparent to the flip (v2
+        // still flips relative to v1, not relative to the group in between).
+        val ttml = """
+            <tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata">
+                <head><metadata>
+                    <ttm:agent type="person" xml:id="v1"/>
+                    <ttm:agent type="person" xml:id="v2"/>
+                    <ttm:agent type="person" xml:id="v3"/>
+                    <ttm:agent type="group" xml:id="v4"/>
+                </metadata></head>
+                <body><div>
+                    <p begin="00:00.000" end="00:01.000" ttm:agent="v1"><span begin="00:00.000" end="00:01.000">One</span></p>
+                    <p begin="00:01.000" end="00:02.000" ttm:agent="v4"><span begin="00:01.000" end="00:02.000">Everyone</span></p>
+                    <p begin="00:02.000" end="00:03.000" ttm:agent="v2"><span begin="00:02.000" end="00:03.000">Two</span></p>
+                    <p begin="00:03.000" end="00:04.000" ttm:agent="v3"><span begin="00:03.000" end="00:04.000">Three</span></p>
+                </div></body>
+            </tt>
+        """.trimIndent()
+
+        val lines = TTMLParser().parse(ttml).lines
+        assertEquals(4, lines.size)
+        assertEquals(KaraokeAlignment.Start, (lines[0] as KaraokeLine).alignment) // v1 first -> left
+        assertEquals(KaraokeAlignment.Start, (lines[1] as KaraokeLine).alignment) // group -> left, transparent
+        assertEquals(KaraokeAlignment.End, (lines[2] as KaraokeLine).alignment)   // v2 flips vs v1 -> right
+        assertEquals(KaraokeAlignment.Start, (lines[3] as KaraokeLine).alignment) // v3 flips vs v2 -> left
+    }
+
+    @Test
+    fun testOtherAgentAlwaysRightAndTransparent() {
+        // An "other" agent is always on the right and does not disturb the person
+        // toggle: v1 stays on the left before and after the "other" line.
+        val ttml = """
+            <tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata">
+                <head><metadata>
+                    <ttm:agent type="person" xml:id="v1"/>
+                    <ttm:agent type="other" xml:id="v2"/>
+                </metadata></head>
+                <body><div>
+                    <p begin="00:00.000" end="00:01.000" ttm:agent="v1"><span begin="00:00.000" end="00:01.000">One</span></p>
+                    <p begin="00:01.000" end="00:02.000" ttm:agent="v2"><span begin="00:01.000" end="00:02.000">Other</span></p>
+                    <p begin="00:02.000" end="00:03.000" ttm:agent="v1"><span begin="00:02.000" end="00:03.000">One again</span></p>
+                </div></body>
+            </tt>
+        """.trimIndent()
+
+        val lines = TTMLParser().parse(ttml).lines
+        assertEquals(3, lines.size)
+        assertEquals(KaraokeAlignment.Start, (lines[0] as KaraokeLine).alignment) // v1 -> left
+        assertEquals(KaraokeAlignment.End, (lines[1] as KaraokeLine).alignment)   // other -> right
+        assertEquals(KaraokeAlignment.Start, (lines[2] as KaraokeLine).alignment) // v1 still left
+    }
+
+    @Test
+    fun testAlignmentSeedsFromFirstLineAgent() {
+        // Our one deviation from Apple: the first line's agent seeds the starting
+        // side by its id. Opening with v2 (even) starts on the RIGHT, then flips.
+        val ttml = """
+            <tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata">
+                <body><div>
+                    <p begin="00:00.000" end="00:01.000" ttm:agent="v2"><span begin="00:00.000" end="00:01.000">First</span></p>
+                    <p begin="00:01.000" end="00:02.000" ttm:agent="v1"><span begin="00:01.000" end="00:02.000">Second</span></p>
+                    <p begin="00:02.000" end="00:03.000" ttm:agent="v2"><span begin="00:02.000" end="00:03.000">Third</span></p>
+                </div></body>
+            </tt>
+        """.trimIndent()
+
+        val lines = TTMLParser().parse(ttml).lines
+        assertEquals(3, lines.size)
+        assertEquals(KaraokeAlignment.End, (lines[0] as KaraokeLine).alignment)   // v2 first -> right
+        assertEquals(KaraokeAlignment.Start, (lines[1] as KaraokeLine).alignment) // v1 -> left
+        assertEquals(KaraokeAlignment.End, (lines[2] as KaraokeLine).alignment)   // v2 keeps right
     }
 }

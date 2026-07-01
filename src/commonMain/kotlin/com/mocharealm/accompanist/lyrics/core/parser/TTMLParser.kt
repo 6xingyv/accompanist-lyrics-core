@@ -28,10 +28,6 @@ class TTMLParser(
     override fun canParse(content: String): Boolean =
         content.contains("http://www.w3.org/ns/ttml")
 
-    override fun parse(lines: List<String>): SyncedLyrics {
-        return parse(lines.joinToString("") { it.trimIndent() })
-    }
-
     // Workaround for AMLL and other tools not strictly following the spec
     private fun preformattingTTML(content: String): String =
         content
@@ -68,12 +64,16 @@ class TTMLParser(
     override fun parse(content: String): SyncedLyrics {
         val root = SimpleXmlParser().parse(preformattingTTML(content))
 
-        val agentAlignments = parseMetadata(root)
+        val agentTypes = parseAgentTypes(root)
         val translations = parseITunesTranslations(root)
         val transliterations = parseITunesTransliterations(root)
 
-        val parsedLines = findAllPElements(root).mapNotNull { pElement ->
-            parseSingleLine(pElement, agentAlignments, translations, transliterations)
+        val sortedPElements = findAllPElements(root)
+            .sortedBy { it.attr("begin")?.parseAsTime() ?: Int.MAX_VALUE }
+        val lineAlignments = computeLineAlignments(sortedPElements, agentTypes)
+
+        val parsedLines = sortedPElements.mapIndexedNotNull { index, pElement ->
+            parseSingleLine(pElement, lineAlignments[index], translations, transliterations)
         }
 
         val syncedLyrics = SyncedLyrics(lines = parsedLines.sortedBy { it.start })
@@ -93,13 +93,12 @@ class TTMLParser(
 
     private fun parseSingleLine(
         p: XmlElement,
-        alignments: Map<String, KaraokeAlignment>,
+        alignment: KaraokeAlignment,
         translations: Map<String, String>,
         transliterations: Map<String, List<String>>
     ): ISyncedLine? {
         val start = p.attr("begin")?.parseAsTime() ?: return null
         val end = p.attr("end")?.parseAsTime() ?: return null
-        val agentId = p.attr("ttm:agent")
         val itunesKey = p.attr("itunes:key", "key")
 
         // 1. 解析主音轨音节
@@ -127,7 +126,7 @@ class TTMLParser(
                 parseAccompaniment(
                     bgSpan,
                     itunesKey,
-                    alignments[agentId],
+                    alignment,
                     translations
                 )
             }
@@ -146,7 +145,7 @@ class TTMLParser(
         return KaraokeLine.MainKaraokeLine(
             syllables = syllables,
             translation = inlineTranslation ?: itunesTranslationPair?.first,
-            alignment = alignments[agentId] ?: KaraokeAlignment.Start,
+            alignment = alignment,
             start = start,
             end = end,
             accompanimentLines = accompanimentLines.ifEmpty { null },
@@ -307,30 +306,69 @@ class TTMLParser(
         return syllables
     }
 
-    private fun parseMetadata(element: XmlElement): Map<String, KaraokeAlignment> {
+    /** Map of `ttm:agent` id → its declared `type` ("person" / "group" / "other"). */
+    private fun parseAgentTypes(root: XmlElement): Map<String, String> {
         fun findMetadata(elem: XmlElement): XmlElement? {
             if (elem.name == "metadata") return elem
             return elem.children.firstNotNullOfOrNull { findMetadata(it) }
         }
-
-        val metadata = findMetadata(element) ?: return emptyMap()
-
+        val metadata = findMetadata(root) ?: return emptyMap()
         return metadata.children
             .filter { it.name.endsWith(":agent") || it.name == "agent" }
-            .mapIndexed { index, agent ->
-                val id = agent.attributes.find {
-                    it.name == "xml:id" || it.name == "id"
-                }?.value ?: ""
-                id to if (index == 0) KaraokeAlignment.Start else KaraokeAlignment.End
+            .mapNotNull { agent ->
+                val id = agent.attributes.find { it.name == "xml:id" || it.name == "id" }?.value
+                val type = agent.attributes.find { it.name == "type" }?.value ?: "person"
+                if (id != null) id to type else null
             }.toMap()
     }
 
-    private fun getAlignmentFromAgent(
-        element: XmlElement,
-        agentAlignments: Map<String, KaraokeAlignment>
-    ): KaraokeAlignment {
-        val agentId = element.attributes.find { it.name == "ttm:agent" }?.value
-        return agentAlignments[agentId] ?: KaraokeAlignment.Start
+    /**
+     * Decide each line's left/right side, matching how Apple Music assembles lines
+     * (`assembleProcessedLines`, reverse-engineered from MusicApplication) — with one
+     * deliberate change: the starting side is seeded from the **first line's agent
+     * id** (v1/v3/v5… → left, v2/v4/v6… → right) instead of Apple's always-left.
+     *
+     * Then, over the lines in start-time order:
+     *  - a **person** agent keeps the current side while the same person keeps
+     *    singing, and **flips** to the other side each time the person changes;
+     *  - a **group** agent (合唱/everyone) is always on the left and is transparent
+     *    to the flip (it neither flips nor becomes the "current" person);
+     *  - an **other** agent is always on the right, also transparent to the flip.
+     *
+     * An agent with no declared type defaults to "person"; a line with no agent at
+     * all keeps the current side.
+     */
+    private fun computeLineAlignments(
+        sortedLines: List<XmlElement>,
+        agentTypes: Map<String, String>
+    ): List<KaraokeAlignment> {
+        val firstOrdinal = sortedLines.firstOrNull()
+            ?.attr("ttm:agent")
+            ?.takeLastWhile { it.isDigit() }
+            ?.toIntOrNull() ?: 1
+        var onRight = firstOrdinal % 2 == 0
+        var currentPerson: String? = null
+
+        fun side() = if (onRight) KaraokeAlignment.End else KaraokeAlignment.Start
+
+        return sortedLines.map { p ->
+            val agentId = p.attr("ttm:agent")
+            val type = if (agentId == null) "none" else agentTypes[agentId] ?: "person"
+            when (type) {
+                "group" -> KaraokeAlignment.Start
+                "other",
+                "person" -> {
+                    if (currentPerson == null) {
+                        currentPerson = agentId
+                    } else if (agentId != currentPerson) {
+                        onRight = !onRight
+                        currentPerson = agentId
+                    }
+                    side()
+                }
+                else -> side()
+            }
+        }
     }
 
     private fun findAllPElements(element: XmlElement): List<XmlElement> {
