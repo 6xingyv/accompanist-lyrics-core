@@ -75,3 +75,18 @@ fun List<KaraokeSyllable>.stripEnclosingParentheses(): List<KaraokeSyllable> {
     }
     return current
 }
+
+fun String.stripEnclosingParentheses(): String {
+    var current = this
+    while (current.isNotEmpty()) {
+        val open = current.indexOfFirst { !it.isWhitespace() }
+        val close = current.indexOfLast { !it.isWhitespace() }
+        if (open !in 0..<close) break
+        if (!isWrappedInMatchedParens(current.substring(open, close + 1))) break
+        current = StringBuilder(current).apply {
+            deleteAt(close)
+            deleteAt(open)
+        }.toString()
+    }
+    return current
+}

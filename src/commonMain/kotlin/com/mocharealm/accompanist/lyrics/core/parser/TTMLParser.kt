@@ -44,16 +44,6 @@ class TTMLParser(
             .replace("&quot;", "\"")
     }
 
-    private fun splitTranslationByBracket(text: String): Pair<String, String?> {
-        if (!text.endsWith('）')) return Pair(text.trim(), null)
-        val bracketStart = text.lastIndexOf('（')
-        if (bracketStart == -1) return Pair(text.trim(), null)
-
-        val outside = text.substring(0, bracketStart).trim()
-        val inside = text.substring(bracketStart + 1, text.length - 1).trim()
-        return Pair(outside, inside.ifEmpty { null })
-    }
-
     private fun XmlElement.attr(vararg names: String) =
         attributes.firstOrNull { it.name in names }?.value
 
@@ -93,7 +83,7 @@ class TTMLParser(
     private fun parseSingleLine(
         p: XmlElement,
         alignment: KaraokeAlignment,
-        translations: Map<String, String>,
+        translations: Map<String, TTMLTranslation>,
         transliterations: Map<String, List<String>>
     ): ISyncedLine? {
         val start = p.attr("begin")?.parseAsTime() ?: return null
@@ -116,7 +106,7 @@ class TTMLParser(
         val inlineTranslation = p.children.firstOrNull {
             it.name == "span" && it.hasRole("x-translation") && !it.hasRole("x-bg")
         }?.text?.trim()
-        val itunesTranslationPair = translations[itunesKey]?.let { splitTranslationByBracket(it) }
+        val itunesTranslation = translations[itunesKey]
 
         // 4. 解析和声轨 (Background Vocals)
         val accompanimentLines = p.children
@@ -135,7 +125,7 @@ class TTMLParser(
             if (content.isEmpty()) return null
             return SyncedLine(
                 content = content,
-                translation = inlineTranslation ?: itunesTranslationPair?.first,
+                translation = inlineTranslation ?: itunesTranslation?.main,
                 start = start,
                 end = end
             )
@@ -143,7 +133,7 @@ class TTMLParser(
 
         return KaraokeLine.MainKaraokeLine(
             syllables = syllables,
-            translation = inlineTranslation ?: itunesTranslationPair?.first,
+            translation = inlineTranslation ?: itunesTranslation?.main,
             alignment = alignment,
             start = start,
             end = end,
@@ -156,46 +146,87 @@ class TTMLParser(
         bgSpan: XmlElement,
         parentKey: String?,
         alignment: KaraokeAlignment?,
-        translations: Map<String, String>
+        translations: Map<String, TTMLTranslation>
     ): KaraokeLine.AccompanimentKaraokeLine? {
-        // Background vocals are commonly wrapped in parentheses as a marker; drop them.
         val syllables = parseSyllablesFromChildren(bgSpan.children).stripEnclosingParentheses()
         if (syllables.isEmpty()) return null
 
         val bgKey = bgSpan.attr("itunes:key", "key") ?: parentKey
         val bgTranslation =
-            bgSpan.children.firstOrNull { it.hasRole("x-translation") }?.text?.trim()
-                ?: translations[bgKey]?.let {
-                    splitTranslationByBracket(it).let { p ->
-                        p.second ?: p.first
-                    }
-                }
+            bgSpan.children
+                .firstOrNull { it.hasRole("x-translation") }
+                ?.let(::extractTextContent)
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?: translations[bgKey]?.background
 
         return KaraokeLine.AccompanimentKaraokeLine(
             syllables = syllables,
-            translation = bgTranslation,
+            translation = bgTranslation?.stripEnclosingParentheses(),
             alignment = alignment ?: KaraokeAlignment.Start,
             start = bgSpan.attr("begin")?.parseAsTime() ?: syllables.first().start,
             end = bgSpan.attr("end")?.parseAsTime() ?: syllables.last().end
         )
     }
 
-    private fun parseITunesTranslations(element: XmlElement): Map<String, String> {
-        val translations = mutableMapOf<String, String>()
+    /** Translation metadata is structurally split into the main and background-vocal tracks. */
+    private data class TTMLTranslation(
+        val main: String?,
+        val background: String?
+    )
+
+    /** Extracts an element's own text plus all descendants, preserving actual lyric content. */
+    private fun extractTextContent(element: XmlElement): String = buildString {
+        append(element.text)
+        element.children.forEach { child ->
+            when (child.name) {
+                "#text" -> append(child.text)
+                else -> append(extractTextContent(child))
+            }
+        }
+    }
+
+    /**
+     * Parses Apple/iTunes translation metadata without flattening nested x-bg spans
+     * into the main-line translation. A metadata <text> may look like:
+     *
+     * <text for="L3">主唱翻译<span ttm:role="x-bg">伴唱翻译</span></text>
+     */
+    private fun parseITunesTranslations(element: XmlElement): Map<String, TTMLTranslation> {
+        val translations = mutableMapOf<String, TTMLTranslation>()
+
         fun findTranslations(elem: XmlElement) {
             if (elem.name == "translation" || elem.name.endsWith(":translation")) {
                 elem.children.forEach { textElem ->
-                    if (textElem.name == "text") {
-                        val key = textElem.attributes.find { it.name == "for" }?.value
-                        val value = textElem.text
-                        if (key != null && value.isNotBlank()) {
-                            translations[key] = value.trim()
-                        }
+                    if (textElem.name != "text") return@forEach
+
+                    val key = textElem.attr("for") ?: return@forEach
+                    val main = decodeXmlEntities(textElem.text)
+                        .trim()
+                        .takeIf { it.isNotEmpty() }
+
+                    val background = textElem.children
+                        .asSequence()
+                        .filter { it.name == "span" && it.hasRole("x-bg") }
+                        .map(::extractTextContent)
+                        .map(::decodeXmlEntities)
+                        .map(String::trim)
+                        .filter { it.isNotEmpty() }
+                        .joinToString("")
+                        .takeIf { it.isNotEmpty() }
+
+                    if (main != null || background != null) {
+                        translations[key] = TTMLTranslation(
+                            main = main,
+                            background = background
+                        )
                     }
                 }
             }
-            elem.children.forEach { findTranslations(it) }
+
+            elem.children.forEach(::findTranslations)
         }
+
         findTranslations(element)
         return translations
     }
