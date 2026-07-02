@@ -39,6 +39,9 @@ object EnhancedLrcParser : ILyricsParser {
     private val voiceParser = Regex("^(v\\d+)\\s*:\\s*(.*)")
     private val tagRegex = Regex("""\[(.*?)\]""")
     private val timestampPattern = Regex("""\d+([:.]\d+)+""")
+    // Precompiled once — these were previously recompiled on every parsed line.
+    private val angleSyllableRegex = Regex("""<([^>]+)>([^<]*)""")
+    private val squareSyllableRegex = Regex("""\[([^\]]+)\]([^\[]*)""")
 
     private fun isTimestamp(s: String): Boolean {
         return timestampPattern.matches(s.trim())
@@ -50,13 +53,11 @@ object EnhancedLrcParser : ILyricsParser {
         val syllables = mutableListOf<KaraokeSyllable>()
 
         val syllableRegex = when (bracketType) {
-            BracketType.ANGLE -> Regex("""<([^>]+)>([^<]*)""")
-            BracketType.SQUARE -> Regex("""\[([^\]]+)\]([^\[]*)""")
+            BracketType.ANGLE -> angleSyllableRegex
+            BracketType.SQUARE -> squareSyllableRegex
         }
 
-        val matches = syllableRegex.findAll(content).toList()
-
-        for (match in matches) {
+        for (match in syllableRegex.findAll(content)) {
             val tsPart = match.groupValues[1].trim()
             val text = match.groupValues[2]
 

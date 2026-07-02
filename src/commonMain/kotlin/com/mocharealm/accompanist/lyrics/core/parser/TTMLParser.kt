@@ -44,6 +44,11 @@ class TTMLParser(
             .replace("&quot;", "\"")
     }
 
+    // Single-name fast path: avoids allocating a vararg array on every lookup
+    // (begin/end/ttm:agent/itunes:key are read for every line and syllable).
+    private fun XmlElement.attr(name: String) =
+        attributes.firstOrNull { it.name == name }?.value
+
     private fun XmlElement.attr(vararg names: String) =
         attributes.firstOrNull { it.name in names }?.value
 
@@ -53,12 +58,20 @@ class TTMLParser(
     override fun parse(content: String): SyncedLyrics {
         val root = SimpleXmlParser().parse(preformattingTTML(content))
 
-        val agentTypes = parseAgentTypes(root)
+        // Agents are declared in the head <metadata>; scope that lookup to it.
+        // Translations/transliterations, however, can be inline within the body in
+        // some Apple/AMLL variants, so those keep searching the whole tree.
+        val metadata = findMetadata(root)
+        val agentTypes = metadata?.let(::parseAgentTypes) ?: emptyMap()
         val translations = parseITunesTranslations(root)
         val transliterations = parseITunesTransliterations(root)
 
+        // Parse each line's begin time once (as the sort key) rather than letting
+        // sortedBy re-evaluate parseAsTime O(n log n) times.
         val sortedPElements = findAllPElements(root)
-            .sortedBy { it.attr("begin")?.parseAsTime() ?: Int.MAX_VALUE }
+            .map { it to (it.attr("begin")?.parseAsTime() ?: Int.MAX_VALUE) }
+            .sortedBy { it.second }
+            .map { it.first }
         val lineAlignments = computeLineAlignments(sortedPElements, agentTypes)
 
         val parsedLines = sortedPElements.mapIndexedNotNull { index, pElement ->
@@ -300,13 +313,22 @@ class TTMLParser(
             val child = children[i]
 
             // We only care about <span> elements that are not for translation or background roles at this level.
-            if (child.name == "span" && child.attributes.none {
-                    it.name.endsWith(":role") && (it.value == "x-translation" || it.value == "x-bg")
-                }) {
-                val spanBegin = child.attributes.find { it.name == "begin" }?.value
-                val spanEnd = child.attributes.find { it.name == "end" }?.value
+            if (child.name == "span") {
+                // Single pass over the (tiny) attribute list: grab begin/end and
+                // detect an excluded role at once instead of scanning it 3×.
+                var spanBegin: String? = null
+                var spanEnd: String? = null
+                var excludedRole = false
+                for (attr in child.attributes) {
+                    when {
+                        attr.name == "begin" -> spanBegin = attr.value
+                        attr.name == "end" -> spanEnd = attr.value
+                        attr.name.endsWith(":role") &&
+                            (attr.value == "x-translation" || attr.value == "x-bg") -> excludedRole = true
+                    }
+                }
 
-                if (spanBegin != null && spanEnd != null && child.text.isNotEmpty()) {
+                if (!excludedRole && spanBegin != null && spanEnd != null && child.text.isNotEmpty()) {
 
                     var syllableContent = decodeXmlEntities(child.text)
 
@@ -336,13 +358,14 @@ class TTMLParser(
         return syllables
     }
 
+    /** The single <metadata> node (in the head), or null. Stops at the first match. */
+    private fun findMetadata(elem: XmlElement): XmlElement? {
+        if (elem.name == "metadata") return elem
+        return elem.children.firstNotNullOfOrNull { findMetadata(it) }
+    }
+
     /** Map of `ttm:agent` id → its declared `type` ("person" / "group" / "other"). */
-    private fun parseAgentTypes(root: XmlElement): Map<String, String> {
-        fun findMetadata(elem: XmlElement): XmlElement? {
-            if (elem.name == "metadata") return elem
-            return elem.children.firstNotNullOfOrNull { findMetadata(it) }
-        }
-        val metadata = findMetadata(root) ?: return emptyMap()
+    private fun parseAgentTypes(metadata: XmlElement): Map<String, String> {
         return metadata.children
             .filter { it.name.endsWith(":agent") || it.name == "agent" }
             .mapNotNull { agent ->
