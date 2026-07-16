@@ -44,6 +44,11 @@ class TTMLParser(
             .replace("&quot;", "\"")
     }
 
+    private fun normalizeXmlTextContent(text: String): String =
+        decodeXmlEntities(text)
+            .replace(Regex("\\s+"), " ")
+            .trim()
+
     // Single-name fast path: avoids allocating a vararg array on every lookup
     // (begin/end/ttm:agent/itunes:key are read for every line and syllable).
     private fun XmlElement.attr(name: String) =
@@ -134,7 +139,7 @@ class TTMLParser(
             }
 
         if (syllables.isEmpty() && accompanimentLines.isEmpty()) {
-            val content = decodeXmlEntities(extractAllText(p)).trim()
+            val content = normalizeXmlTextContent(extractAllText(p))
             if (content.isEmpty()) return null
             return SyncedLine(
                 content = content,

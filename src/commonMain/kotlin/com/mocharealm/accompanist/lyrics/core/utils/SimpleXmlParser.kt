@@ -111,20 +111,25 @@ internal class SimpleXmlParser {
      *
      * - 普通文本：写入当前元素的 text。
      * - 单行空格：保留为 #text，供 TTML 音节间空格使用。
-     * - 包含换行的纯空白：视为 XML 排版缩进，直接忽略。
+     * - 包含换行的纯空白：通常是 XML 排版缩进，直接忽略；但若换行前
+     *   已有内联空格（`</span> \n<span>`），则保留一个空格作为歌词分词。
      */
     private fun appendText(element: MutableElement, rawText: String) {
         if (rawText.isBlank()) {
-            val isLayoutWhitespace =
-                rawText.contains('\n') || rawText.contains('\r')
+            val inlinePrefix = rawText.takeWhile { it != '\n' && it != '\r' }
+            val hasSemanticInlineSpace = inlinePrefix.any { it == ' ' || it == '\t' }
+            val isLayoutWhitespace = rawText.contains('\n') || rawText.contains('\r')
 
-            if (!isLayoutWhitespace) {
+            if (!isLayoutWhitespace || hasSemanticInlineSpace) {
                 element.children.add(
                     XmlElement(
                         name = "#text",
                         attributes = emptyList(),
                         children = emptyList(),
-                        text = rawText
+                        // XML formatting indentation must not become multiple
+                        // visible gaps. A text node here only represents one word
+                        // separator, regardless of its indentation width.
+                        text = " "
                     )
                 )
             }

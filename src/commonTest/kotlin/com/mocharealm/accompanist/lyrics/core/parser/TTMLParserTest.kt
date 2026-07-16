@@ -284,6 +284,43 @@ class TTMLParserTest {
     }
 
     @Test
+    fun testSyncedLineCollapsesTtmlLayoutWhitespace() {
+        val ttml = """
+            <tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata">
+                <body><div>
+                    <p begin="00:42.723" end="00:48.909">Oh, and when your little
+                        legs rest on my shoulders</p>
+                    <p begin="02:02.567" end="02:04.112">Breathe, breathe into
+                        me</p>
+                </div></body>
+            </tt>
+        """.trimIndent()
+
+        val lines = TTMLParser().parse(ttml).lines
+
+        assertEquals("Oh, and when your little legs rest on my shoulders", (lines[0] as SyncedLine).content)
+        assertEquals("Breathe, breathe into me", (lines[1] as SyncedLine).content)
+    }
+
+    @Test
+    fun testKaraokeSyllableSpacingStillUsesTextNodes() {
+        val ttml = """
+            <tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata">
+                <body><div>
+                    <p begin="00:00.000" end="00:02.000">
+                        <span begin="00:00.000" end="00:01.000">Hello</span> <span begin="00:01.000" end="00:02.000">world</span>
+                    </p>
+                </div></body>
+            </tt>
+        """.trimIndent()
+
+        val line = TTMLParser().parse(ttml).lines[0] as KaraokeLine.MainKaraokeLine
+
+        assertEquals("Hello ", line.syllables[0].content)
+        assertEquals("world", line.syllables[1].content)
+    }
+
+    @Test
     fun testAlignmentFlipsOnPersonChangeWithGroupTransparent() {
         // Apple's model: person singers flip the side each time the person changes;
         // a "group" agent is always on the LEFT and is transparent to the flip (v2
@@ -357,5 +394,15 @@ class TTMLParserTest {
         assertEquals(KaraokeAlignment.End, (lines[0] as KaraokeLine).alignment)   // v2 first -> right
         assertEquals(KaraokeAlignment.Start, (lines[1] as KaraokeLine).alignment) // v1 -> left
         assertEquals(KaraokeAlignment.End, (lines[2] as KaraokeLine).alignment)   // v2 keeps right
+    }
+
+    @Test
+    fun testPreservesInlineSpaceBeforePrettyPrintedSpan() {
+        val ttml = """<tt xmlns="http://www.w3.org/ns/ttml"><body><div><p begin="00:00.000" end="00:01.000"><span begin="00:00.000" end="00:00.500">Get</span> 
+            <span begin="00:00.500" end="00:01.000">around</span></p></div></body></tt>"""
+
+        val line = TTMLParser().parse(ttml).lines.single() as KaraokeLine
+        assertEquals("Get ", line.syllables[0].content)
+        assertEquals("Get around", line.syllables.joinToString("") { it.content })
     }
 }
