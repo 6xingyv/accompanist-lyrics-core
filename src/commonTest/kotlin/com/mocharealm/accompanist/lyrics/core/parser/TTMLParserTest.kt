@@ -405,4 +405,48 @@ class TTMLParserTest {
         assertEquals("Get ", line.syllables[0].content)
         assertEquals("Get around", line.syllables.joinToString("") { it.content })
     }
+
+    @Test
+    fun testIndentedAndMultiLineSpansDoNotContainNewlinesOrTabs() {
+        val ttmlWithSpace = """
+            <tt xmlns="http://www.w3.org/ns/ttml">
+              <body>
+                <div>
+                  <p begin="00:00.000" end="00:02.000">
+                    <span begin="00:00.000" end="00:01.000">Hello</span> 
+                    <span begin="00:01.000" end="00:02.000">world</span>
+                  </p>
+                </div>
+              </body>
+            </tt>
+        """.trimIndent()
+
+        val lineWithSpace = TTMLParser().parse(ttmlWithSpace).lines.single() as KaraokeLine
+        assertEquals("Hello ", lineWithSpace.syllables[0].content)
+        assertEquals("world", lineWithSpace.syllables[1].content)
+        assertEquals("Hello world", lineWithSpace.syllables.joinToString("") { it.content })
+        lineWithSpace.syllables.forEach {
+            assertTrue(!it.content.contains("\n") && !it.content.contains("\r") && !it.content.contains("\t"))
+        }
+
+        val ttmlTight = """
+            <tt xmlns="http://www.w3.org/ns/ttml">
+              <body>
+                <div>
+                  <p begin="00:00.000" end="00:02.000">
+                    <span begin="00:00.000" end="00:01.000">Hello</span>
+                    <span begin="00:01.000" end="00:02.000">world</span>
+                  </p>
+                </div>
+              </body>
+            </tt>
+        """.trimIndent()
+
+        val lineTight = TTMLParser().parse(ttmlTight).lines.single() as KaraokeLine
+        assertEquals("Hello", lineTight.syllables[0].content)
+        assertEquals("world", lineTight.syllables[1].content)
+        lineTight.syllables.forEach {
+            assertTrue(!it.content.contains("\n") && !it.content.contains("\r") && !it.content.contains("\t"))
+        }
+    }
 }

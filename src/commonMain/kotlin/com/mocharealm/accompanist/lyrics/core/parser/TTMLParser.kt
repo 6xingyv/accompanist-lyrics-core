@@ -339,7 +339,14 @@ class TTMLParser(
 
                     val nextSibling = children.getOrNull(i + 1)
                     if (nextSibling != null && nextSibling.name == "#text") {
-                        syllableContent += decodeXmlEntities(nextSibling.text)
+                        val decoded = decodeXmlEntities(nextSibling.text)
+                        if (!decoded.contains('\n') && !decoded.contains('\r')) {
+                            syllableContent += decoded
+                        } else {
+                            if (!syllableContent.endsWith(' ')) {
+                                syllableContent += " "
+                            }
+                        }
                     }
 
                     syllables.add(
