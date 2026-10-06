@@ -6,6 +6,8 @@ data class KaraokeSyllable(
     val start: Int,
     val end: Int,
     val phonetic: String? = null,
+    /** BCP-47 language tag used when generating a fallback phonetic. */
+    val languageTag: String? = null,
 ) {
     val duration = end - start
 

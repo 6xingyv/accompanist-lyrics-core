@@ -73,14 +73,21 @@ class TTMLParser(
 
         // Parse each line's begin time once (as the sort key) rather than letting
         // sortedBy re-evaluate parseAsTime O(n log n) times.
-        val sortedPElements = findAllPElements(root)
-            .map { it to (it.attr("begin")?.parseAsTime() ?: Int.MAX_VALUE) }
+        val sortedParagraphs = findAllPElements(root)
+            .map { it to (it.first.attr("begin")?.parseAsTime() ?: Int.MAX_VALUE) }
             .sortedBy { it.second }
             .map { it.first }
+        val sortedPElements = sortedParagraphs.map { it.first }
         val lineAlignments = computeLineAlignments(sortedPElements, agentTypes)
 
-        val parsedLines = sortedPElements.mapIndexedNotNull { index, pElement ->
-            parseSingleLine(pElement, lineAlignments[index], translations, transliterations)
+        val parsedLines = sortedParagraphs.mapIndexedNotNull { index, (pElement, languageTag) ->
+            parseSingleLine(
+                pElement,
+                lineAlignments[index],
+                translations,
+                transliterations,
+                languageTag,
+            )
         }
 
         val syncedLyrics = SyncedLyrics(lines = parsedLines.sortedBy { it.start })
@@ -102,14 +109,16 @@ class TTMLParser(
         p: XmlElement,
         alignment: KaraokeAlignment,
         translations: Map<String, TTMLTranslation>,
-        transliterations: Map<String, List<String>>
+        transliterations: Map<String, List<String>>,
+        inheritedLanguageTag: String?,
     ): ISyncedLine? {
         val start = p.attr("begin")?.parseAsTime() ?: return null
         val end = p.attr("end")?.parseAsTime() ?: return null
         val itunesKey = p.attr("itunes:key", "key")
+        val languageTag = p.attr("xml:lang", "lang") ?: inheritedLanguageTag
 
         // 1. 解析主音轨音节
-        var syllables = parseSyllablesFromChildren(p.children)
+        var syllables = parseSyllablesFromChildren(p.children, languageTag)
         transliterations[itunesKey]?.let { phonetics ->
             if (phonetics.size == syllables.size) {
                 syllables = syllables.mapIndexed { i, s -> s.copy(phonetic = phonetics[i]) }
@@ -134,7 +143,8 @@ class TTMLParser(
                     bgSpan,
                     itunesKey,
                     alignment,
-                    translations
+                    translations,
+                    languageTag,
                 )
             }
 
@@ -156,7 +166,8 @@ class TTMLParser(
             start = start,
             end = end,
             accompanimentLines = accompanimentLines.ifEmpty { null },
-            phonetic = linePhonetic
+            phonetic = linePhonetic,
+            languageTag = languageTag ?: syllables.firstNotNullOfOrNull { it.languageTag },
         )
     }
 
@@ -164,9 +175,12 @@ class TTMLParser(
         bgSpan: XmlElement,
         parentKey: String?,
         alignment: KaraokeAlignment?,
-        translations: Map<String, TTMLTranslation>
+        translations: Map<String, TTMLTranslation>,
+        parentLanguageTag: String?,
     ): KaraokeLine.AccompanimentKaraokeLine? {
-        val syllables = parseSyllablesFromChildren(bgSpan.children).stripEnclosingParentheses()
+        val languageTag = bgSpan.attr("xml:lang", "lang") ?: parentLanguageTag
+        val syllables =
+            parseSyllablesFromChildren(bgSpan.children, languageTag).stripEnclosingParentheses()
         if (syllables.isEmpty()) return null
 
         val bgKey = bgSpan.attr("itunes:key", "key") ?: parentKey
@@ -183,7 +197,8 @@ class TTMLParser(
             translation = bgTranslation?.stripEnclosingParentheses(),
             alignment = alignment ?: KaraokeAlignment.Start,
             start = bgSpan.attr("begin")?.parseAsTime() ?: syllables.first().start,
-            end = bgSpan.attr("end")?.parseAsTime() ?: syllables.last().end
+            end = bgSpan.attr("end")?.parseAsTime() ?: syllables.last().end,
+            languageTag = languageTag ?: syllables.firstNotNullOfOrNull { it.languageTag },
         )
     }
 
@@ -293,12 +308,24 @@ class TTMLParser(
 
             return@map when (provider.phoneticLevel) {
                 PhoneticLevel.LINE -> {
-                    line.copy(phonetic = provider.getPhonetic(line.syllables.contentToString()))
+                    line.copy(
+                        phonetic =
+                            provider.getPhonetic(
+                                line.syllables.contentToString(),
+                                line.languageTag,
+                            )
+                    )
                 }
 
                 PhoneticLevel.SYLLABLE -> {
                     val newSyllables = line.syllables.map { syllable ->
-                        syllable.copy(phonetic = provider.getPhonetic(syllable.content))
+                        syllable.copy(
+                            phonetic =
+                                provider.getPhonetic(
+                                    syllable.content,
+                                    syllable.languageTag ?: line.languageTag,
+                                )
+                        )
                     }
                     line.copy(syllables = newSyllables)
                 }
@@ -312,7 +339,10 @@ class TTMLParser(
      * Parses a list of XmlElement children to extract KaraokeSyllables.
      * This function intelligently handles spacing by checking for `#text` nodes between `<span>` elements.
      */
-    private fun parseSyllablesFromChildren(children: List<XmlElement>): List<KaraokeSyllable> {
+    private fun parseSyllablesFromChildren(
+        children: List<XmlElement>,
+        languageTag: String? = null,
+    ): List<KaraokeSyllable> {
         val syllables = mutableListOf<KaraokeSyllable>()
         for (i in children.indices) {
             val child = children[i]
@@ -346,7 +376,11 @@ class TTMLParser(
                         KaraokeSyllable(
                             content = syllableContent,
                             start = spanBegin.parseAsTime(),
-                            end = spanEnd.parseAsTime()
+                            end = spanEnd.parseAsTime(),
+                            languageTag =
+                                child.attributes.firstOrNull {
+                                    it.name == "xml:lang" || it.name == "lang"
+                                }?.value ?: languageTag,
                         )
                     )
                 }
@@ -429,13 +463,17 @@ class TTMLParser(
         }
     }
 
-    private fun findAllPElements(element: XmlElement): List<XmlElement> {
-        val pElements = mutableListOf<XmlElement>()
+    private fun findAllPElements(
+        element: XmlElement,
+        inheritedLanguageTag: String? = null,
+    ): List<Pair<XmlElement, String?>> {
+        val pElements = mutableListOf<Pair<XmlElement, String?>>()
+        val languageTag = element.attr("xml:lang", "lang") ?: inheritedLanguageTag
         if (element.name == "p") {
-            pElements.add(element)
+            pElements.add(element to languageTag)
         }
         element.children.forEach { child ->
-            pElements.addAll(findAllPElements(child))
+            pElements.addAll(findAllPElements(child, languageTag))
         }
         return pElements
     }
