@@ -4,6 +4,19 @@ on:
   push:
     tags: ['v*', '[0-9]*']
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to release
+        required: true
+        type: string
+      deployment_id:
+        description: Existing Maven deployment to finish after a publishing timeout
+        required: false
+        type: string
+      source_run_id:
+        description: Original Release run containing the verified packages
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -14,8 +27,9 @@ concurrency:
 
 jobs:
   build:
+    if: inputs.deployment_id == ''
     runs-on: macos-26
-    timeout-minutes: 60
+    timeout-minutes: 90
     outputs:
       version: ${{ steps.version.outputs.version }}
       prerelease: ${{ steps.version.outputs.prerelease }}
@@ -23,12 +37,15 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+          ref: ${{ inputs.tag || github.ref }}
       - uses: ./.github/actions/setup
       - name: Resolve version
         id: version
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
         shell: bash
         run: |
-          version="${GITHUB_REF_NAME#v}"
+          version="${TAG#v}"
           if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ || "$version" == *-SNAPSHOT ]]; then
             echo '::error::Use a release tag such as v0.5.0 or v0.6.0-rc.1'
             exit 1
@@ -93,26 +110,81 @@ jobs:
           if [[ -z "$ORG_GRADLE_PROJECT_signingInMemoryKeyId" ]]; then
             unset ORG_GRADLE_PROJECT_signingInMemoryKeyId
           fi
-          bash ./gradlew --no-daemon --max-workers=2 "-PreleaseVersion=$VERSION" \
+          bash ./gradlew --no-daemon --max-workers=2 -PSONATYPE_CLOSE_TIMEOUT_SECONDS=3600 "-PreleaseVersion=$VERSION" \
             publishToMavenCentral
 
+  resume:
+    if: inputs.deployment_id != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    outputs:
+      version: ${{ steps.status.outputs.version }}
+      prerelease: ${{ steps.status.outputs.prerelease }}
+    steps:
+      - name: Verify the existing Maven deployment
+        id: status
+        env:
+          TAG: ${{ inputs.tag }}
+          DEPLOYMENT_ID: ${{ inputs.deployment_id }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          MAVEN_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+        shell: bash
+        run: |
+          python3 -u - <<'PY'
+          import base64, json, os, re, time
+          from urllib.request import Request, urlopen
+          version = os.environ['TAG'].removeprefix('v')
+          if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?', version):
+              raise SystemExit('A version tag is required')
+          if not re.fullmatch(r'[0-9a-f-]{36}', os.environ['DEPLOYMENT_ID']) or not os.environ['SOURCE_RUN_ID'].isdigit():
+              raise SystemExit('Provide the existing deployment UUID and original Release run ID')
+          credentials = f'{os.environ["MAVEN_USERNAME"]}:{os.environ["MAVEN_PASSWORD"]}'
+          token = base64.b64encode(credentials.encode()).decode()
+          deadline = time.monotonic() + 60 * 60
+          while True:
+              request = Request('https://central.sonatype.com/api/v1/publisher/status?id=' + os.environ['DEPLOYMENT_ID'],
+                                data=b'', headers={'Authorization': 'Bearer ' + token}, method='POST')
+              with urlopen(request, timeout=30) as response:
+                  status = json.load(response)
+              state = status['deploymentState']
+              print('Existing Maven deployment:', state)
+              if state == 'PUBLISHED':
+                  expected = 'pkg:maven/com.mocharealm.accompanist/lyrics-core@' + version
+                  if not any(purl.split('?')[0] == expected for purl in status.get('purls', [])):
+                      raise SystemExit('Deployment does not contain the requested library version')
+                  break
+              if state == 'FAILED' or time.monotonic() >= deadline:
+                  raise SystemExit(f'Maven deployment did not publish: {status}')
+              time.sleep(30)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'version={version}\nprerelease={str("-" in version).lower()}\n')
+          PY
+
   release:
-    needs: build
+    needs: [build, resume]
+    if: ${{ !cancelled() && (needs.build.result == 'success' || needs.resume.result == 'success') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: write
+      actions: read
     steps:
       - uses: actions/download-artifact@v8
         with:
-          name: lyrics-core-${{ needs.build.outputs.version }}
+          name: lyrics-core-${{ needs.build.outputs.version || needs.resume.outputs.version }}
           path: dist
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.source_run_id || github.run_id }}
+      - name: Verify package checksums
+        shell: bash
+        run: (cd dist && sha256sum --check SHA256SUMS.txt)
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          TAG: ${{ github.ref_name }}
-          PRERELEASE: ${{ needs.build.outputs.prerelease }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+          PRERELEASE: ${{ needs.build.outputs.prerelease || needs.resume.outputs.prerelease }}
         shell: bash
         run: |
           if gh release view "$TAG" --json isDraft > release.json; then
