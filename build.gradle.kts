@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "com.mocharealm.accompanist"
-version = "0.4.7"
+version = "0.5.0"
 
 kotlin {
     jvmToolchain(21)
@@ -72,7 +72,9 @@ publishing {
 
 mavenPublishing {
     publishToMavenCentral(automaticRelease = true)
-    signAllPublications()
+    if (!providers.gradleProperty("localUnsigned").map(String::toBoolean).getOrElse(false)) {
+        signAllPublications()
+    }
 
     coordinates(group.toString(), "lyrics-core", version.toString())
 
