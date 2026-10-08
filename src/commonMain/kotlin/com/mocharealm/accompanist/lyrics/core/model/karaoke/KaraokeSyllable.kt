@@ -8,6 +8,10 @@ data class KaraokeSyllable(
     val phonetic: String? = null,
     /** BCP-47 language tag used when generating a fallback phonetic. */
     val languageTag: String? = null,
+    /** Formatter-owned boundary before this caption when adjacent timed fragments are combined.
+     * Empty by default for legacy word fragments, such as "to" + "night".
+     */
+    val phoneticSeparatorBefore: String = "",
 ) {
     val duration = end - start
 

@@ -1,13 +1,14 @@
 package com.mocharealm.accompanist.lyrics.core.model.synced
 
 import com.mocharealm.accompanist.lyrics.core.model.ISyncedLine
-import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine
 
 data class SyncedLine(
     val content: String,
     val translation: String?,
     override val start: Int,
     override val end: Int,
+    val phonetic: String? = null,
+    val languageTag: String? = null,
 ) : ISyncedLine {
     override val duration = end - start
     init {
@@ -20,6 +21,8 @@ data class UncheckedSyncedLine(
     val translation: String?,
     override val start: Int,
     override val end: Int,
+    val phonetic: String? = null,
+    val languageTag: String? = null,
 ) : ISyncedLine {
     override val duration = (end - start).takeIf { it >= 0 } ?: 0
 
@@ -28,7 +31,9 @@ data class UncheckedSyncedLine(
             this.content,
             this.translation,
             this.start,
-            this.end
+            this.end,
+            this.phonetic,
+            this.languageTag,
         )
     }
 }

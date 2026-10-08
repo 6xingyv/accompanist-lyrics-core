@@ -66,6 +66,12 @@ println(lyrics.metadata.title)
 println(lyrics.lines.first().text)
 ```
 
+### Contextual pronunciation captions (0.5.0)
+
+Pass `fallbackPhoneticProvider` to `AutoParser` to enrich every supported format, including ordinary LRC `SyncedLine` captions. Standalone TTML parsing supports the same provider. `SyncedLine` now has optional `phonetic` and `languageTag` fields; enrichment preserves source timing, supplied captions, nested accompaniment and lyrics metadata.
+
+Contextual providers override `PhoneticProvider.resolve(PhoneticRequest)`. The request contains the complete original text, UTF-16 language hint ranges and requested projection ranges. Resolve the complete context once; return a line caption and ordered `PhoneticProjection` values. `phonetic=null, aligned=true` deliberately omits a caption (for example Latin text), while `aligned=false` means word-to-fragment alignment is unknown and requires a line caption fallback. Projection `separatorBefore` is formatter-owned boundary metadata, propagated to `KaraokeSyllable.phoneticSeparatorBefore`; renderers preserve it when merging captions. Legacy string providers remain supported. `SyncedLyrics.withPhonetics(provider)` exposes the same enrichment outside parsers.
+
 ### Parsing a Specific Format
 
 If you know the exact format, you can use a specific parser directly.
@@ -146,3 +152,5 @@ Contributions are welcome\! Please feel free to submit a pull request or open an
 ## 📜 License
 
 This project is licensed under the **Apache License 2.0**. See the [LICENSE](http://www.apache.org/licenses/LICENSE-2.0.txt) file for details.
+
+TTML supplied transliterations take precedence over generated captions. Supplied caption fragments attach to the original `KaraokeSyllable.phonetic` and inherit its timing. The importer groups finer metadata fragments using association hints without requiring identical timing boundaries, changing the source syllables, or exposing a separate pronunciation clock. Untimed one-to-one fragments remain supported; plain line metadata remains a line caption.

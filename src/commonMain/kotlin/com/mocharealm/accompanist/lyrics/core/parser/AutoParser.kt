@@ -2,6 +2,7 @@ package com.mocharealm.accompanist.lyrics.core.parser
 
 import com.mocharealm.accompanist.lyrics.core.model.SyncedLyrics
 import com.mocharealm.accompanist.lyrics.core.utils.PhoneticProvider
+import com.mocharealm.accompanist.lyrics.core.utils.withPhonetics
 
 /**
  * A smart parser that automatically detects the lyrics format and uses the appropriate parser.
@@ -15,7 +16,7 @@ import com.mocharealm.accompanist.lyrics.core.utils.PhoneticProvider
 class AutoParser(
     private val fallbackPhoneticProvider: PhoneticProvider? = null,
     private val parsers: List<ILyricsParser> = listOf(
-        TTMLParser(fallbackPhoneticProvider = fallbackPhoneticProvider),
+        TTMLParser(),
         LyricifySyllableParser,
         EnhancedLrcParser,
         KugouKrcParser,
@@ -28,6 +29,7 @@ class AutoParser(
 
     override fun parse(content: String): SyncedLyrics {
         val parser = parsers.firstOrNull { it.canParse(content) }
-        return parser?.parse(content) ?: SyncedLyrics(emptyList())
+        val lyrics = parser?.parse(content) ?: SyncedLyrics(emptyList())
+        return fallbackPhoneticProvider?.let { lyrics.withPhonetics(it) } ?: lyrics
     }
 }

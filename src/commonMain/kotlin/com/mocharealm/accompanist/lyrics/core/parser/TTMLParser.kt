@@ -5,7 +5,7 @@ import com.mocharealm.accompanist.lyrics.core.model.SyncedLyrics
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeAlignment
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeSyllable
-import com.mocharealm.accompanist.lyrics.core.model.karaoke.PhoneticLevel
+import com.mocharealm.accompanist.lyrics.core.utils.withPhonetics
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.copy
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.mapper.contentToString
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.mapper.stripEnclosingParentheses
@@ -109,7 +109,7 @@ class TTMLParser(
         p: XmlElement,
         alignment: KaraokeAlignment,
         translations: Map<String, TTMLTranslation>,
-        transliterations: Map<String, List<String>>,
+        transliterations: Map<String, TTMLTransliteration>,
         inheritedLanguageTag: String?,
     ): ISyncedLine? {
         val start = p.attr("begin")?.parseAsTime() ?: return null
@@ -119,15 +119,16 @@ class TTMLParser(
 
         // 1. 解析主音轨音节
         var syllables = parseSyllablesFromChildren(p.children, languageTag)
-        transliterations[itunesKey]?.let { phonetics ->
-            if (phonetics.size == syllables.size) {
-                syllables = syllables.mapIndexed { i, s -> s.copy(phonetic = phonetics[i]) }
-            }
-        }
 
-        // 2. 解析主音轨注音 (Line Level)
-        val linePhonetic =
-            p.children.firstOrNull { it.name == "span" && it.hasRole("x-roman") }?.text?.trim()
+        // Pronunciation captions inherit the original line/syllable clock.
+        val linePhonetic = p.children.firstOrNull { it.name == "span" && it.hasRole("x-roman") }
+            ?.let(::extractTextContent)?.let(::normalizeXmlTextContent)?.takeIf { it.isNotEmpty() }
+        var metadataPhonetic: String? = null
+        if (linePhonetic == null) transliterations[itunesKey]?.let { supplied ->
+            val attached = attachTransliteration(supplied, syllables)
+            if (attached == null) metadataPhonetic = supplied.text else syllables = attached
+        }
+        val caption = linePhonetic ?: metadataPhonetic
 
         // 3. 解析主音轨翻译
         val inlineTranslation = p.children.firstOrNull {
@@ -155,7 +156,9 @@ class TTMLParser(
                 content = content,
                 translation = inlineTranslation ?: itunesTranslation?.main,
                 start = start,
-                end = end
+                end = end,
+                phonetic = caption,
+                languageTag = languageTag,
             )
         }
 
@@ -166,7 +169,7 @@ class TTMLParser(
             start = start,
             end = end,
             accompanimentLines = accompanimentLines.ifEmpty { null },
-            phonetic = linePhonetic,
+            phonetic = caption,
             languageTag = languageTag ?: syllables.firstNotNullOfOrNull { it.languageTag },
         )
     }
@@ -264,8 +267,52 @@ class TTMLParser(
         return translations
     }
 
-    private fun parseITunesTransliterations(element: XmlElement): Map<String, List<String>> {
-        val transliterations = mutableMapOf<String, List<String>>()
+    // Import-only association hints. They never become a pronunciation clock or public timing fields.
+    private data class TTMLPhoneticSpan(val text: String, val begin: Int?, val end: Int?)
+    private data class TTMLTransliteration(val text: String, val spans: List<TTMLPhoneticSpan>)
+
+    /** Attach supplied fragments to source captions; playback always uses the source syllable times.
+     * Metadata times help associate differently segmented fragments, without validating, rejecting,
+     * retiming or splitting either caption because their boundaries differ.
+     */
+    private fun attachTransliteration(supplied: TTMLTransliteration, syllables: List<KaraokeSyllable>): List<KaraokeSyllable>? {
+        if (syllables.isEmpty() || supplied.spans.isEmpty()) return null
+        val spans = supplied.spans
+        // Plain text outside spans must remain visible, rather than being discarded during attachment.
+        if (normalizeXmlTextContent(spans.joinToString("") { it.text }) != supplied.text) return null
+        val groups = Array(syllables.size) { StringBuilder() }
+        val sourceIndices = syllables.indices.filter { index -> syllables[index].content.any { it.isLetterOrDigit() } }
+            .ifEmpty { syllables.indices.toList() }
+        val ordinal = spans.size == syllables.size
+        if (!ordinal && spans.all { it.begin == null }) return null
+        var previous = sourceIndices.first()
+        for ((index, span) in spans.withIndex()) {
+            val target = if (ordinal) index else {
+                val begin = span.begin ?: syllables[previous].start
+                val end = span.end ?: begin
+                sourceIndices.maxWithOrNull(compareBy<Int> { source ->
+                    (minOf(end.toLong(), syllables[source].end.toLong()) - maxOf(begin.toLong(), syllables[source].start.toLong())).coerceAtLeast(0)
+                }.thenBy { source -> -kotlin.math.abs(syllables[source].start.toLong() - begin) })!!.coerceAtLeast(previous)
+            }
+            groups[target].append(span.text)
+            previous = target
+        }
+        var separator = ""
+        var hasCaption = false
+        return syllables.mapIndexed { index, syllable ->
+            val raw = groups[index].toString()
+            val phonetic = normalizeXmlTextContent(raw).ifEmpty { null }
+            val boundary = if (hasCaption && phonetic != null && (separator.isNotEmpty() || raw.firstOrNull()?.isWhitespace() == true)) " " else ""
+            if (phonetic != null) {
+                hasCaption = true
+                separator = if (raw.lastOrNull()?.isWhitespace() == true) " " else ""
+            }
+            syllable.copy(phonetic = phonetic, phoneticSeparatorBefore = boundary)
+        }
+    }
+
+    private fun parseITunesTransliterations(element: XmlElement): Map<String, TTMLTransliteration> {
+        val transliterations = mutableMapOf<String, TTMLTransliteration>()
 
         // 递归寻找 <transliterations> 节点
         fun findTransliterations(elem: XmlElement) {
@@ -275,13 +322,17 @@ class TTMLParser(
                         transElem.children.forEach { textElem ->
                             if (textElem.name == "text") {
                                 val key = textElem.attributes.find { it.name == "for" }?.value
-                                // 提取所有内部 span 的文本作为音标列表
                                 val phoneticSpans = textElem.children
-                                    .filter { it.name == "span" }
-                                    .map { decodeXmlEntities(it.text).trim() }
+                                    .mapIndexedNotNull { index, child ->
+                                        if (child.name != "span") return@mapIndexedNotNull null
+                                        val suffix = textElem.children.getOrNull(index + 1)?.takeIf { it.name == "#text" }?.text.orEmpty()
+                                        val text = decodeXmlEntities(extractTextContent(child)) + decodeXmlEntities(suffix)
+                                        TTMLPhoneticSpan(text, child.attr("begin")?.parseAsTime(), child.attr("end")?.parseAsTime())
+                                    }
 
-                                if (key != null && phoneticSpans.isNotEmpty()) {
-                                    transliterations[key] = phoneticSpans
+                                val text = normalizeXmlTextContent(extractTextContent(textElem))
+                                if (key != null && text.isNotEmpty()) {
+                                    transliterations[key] = TTMLTransliteration(text, phoneticSpans)
                                 }
                             }
                         }
@@ -297,42 +348,7 @@ class TTMLParser(
 
     private fun applyFallbackPhonetics(syncedLyrics: SyncedLyrics): SyncedLyrics {
         val provider = fallbackPhoneticProvider ?: return syncedLyrics
-        val processedLines = syncedLyrics.lines.map { line ->
-            if (line !is KaraokeLine) return@map line
-
-            // 如果当前行已有任何形式的发音（行级或音节级），则不进行 fallback
-            val hasExistingPhonetic = !line.phonetic.isNullOrBlank() ||
-                    line.syllables.any { !it.phonetic.isNullOrBlank() }
-
-            if (hasExistingPhonetic) return@map line
-
-            return@map when (provider.phoneticLevel) {
-                PhoneticLevel.LINE -> {
-                    line.copy(
-                        phonetic =
-                            provider.getPhonetic(
-                                line.syllables.contentToString(),
-                                line.languageTag,
-                            )
-                    )
-                }
-
-                PhoneticLevel.SYLLABLE -> {
-                    val newSyllables = line.syllables.map { syllable ->
-                        syllable.copy(
-                            phonetic =
-                                provider.getPhonetic(
-                                    syllable.content,
-                                    syllable.languageTag ?: line.languageTag,
-                                )
-                        )
-                    }
-                    line.copy(syllables = newSyllables)
-                }
-            }
-        }
-
-        return SyncedLyrics(lines = processedLines)
+        return syncedLyrics.withPhonetics(provider)
     }
 
     /**

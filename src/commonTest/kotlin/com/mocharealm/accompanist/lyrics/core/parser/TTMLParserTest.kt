@@ -72,7 +72,7 @@ class TTMLParserTest {
         val result = TTMLParser(provider).parse(ttml)
         val line = result.lines[0] as KaraokeLine.MainKaraokeLine
 
-        // Should keep existing syllable phonetic and NOT apply fallback to line
+        // Existing pronunciation captions suppress fallback.
         assertEquals("SyllablePhonetic", line.syllables[0].phonetic)
         assertEquals(null, line.phonetic)
     }

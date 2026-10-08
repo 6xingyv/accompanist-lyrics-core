@@ -12,12 +12,15 @@ fun SyncedLine.toKaraokeLine(): KaraokeLine {
             KaraokeSyllable(
                 this.content,
                 this.start,
-                this.end
+                this.end,
+                languageTag = this.languageTag,
             )
         ),
         translation = this.translation,
         alignment = KaraokeAlignment.Unspecified,
         start = this.start,
-        end = this.end
+        end = this.end,
+        phonetic = this.phonetic,
+        languageTag = this.languageTag,
     )
 }

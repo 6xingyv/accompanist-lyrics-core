@@ -9,6 +9,8 @@ fun KaraokeLine.toSyncedLine(): SyncedLine {
         content = this.syllables.contentToString().trim(),
         translation = this.translation,
         start = this.start,
-        end = this.end
+        end = this.end,
+        phonetic = this.phonetic,
+        languageTag = this.languageTag,
     )
 }
