@@ -1,51 +1,48 @@
-name: Run Tests
+name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: ['**']
   pull_request:
-    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
-    runs-on: ubuntu-latest
-    
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            tasks: jvmTest jsNodeTest jsBrowserTest wasmJsNodeTest wasmJsBrowserTest
+          - os: macos-26
+            tasks: macosArm64Test iosSimulatorArm64Test
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Set up JDK
-      uses: actions/setup-java@v3
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-        cache: 'gradle'
-        
-    - name: Cache Gradle build cache
-      uses: actions/cache@v3
-      with:
-        path: |
-          ~/.gradle/caches
-          ~/.gradle/wrapper
-          ~/.gradle/daemon
-          .gradle/
-        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-        restore-keys: |
-          ${{ runner.os }}-gradle-
-        
-    - name: Make Gradle wrapper executable
-      run: chmod +x ./gradlew
-        
-    - name: Setup Gradle
-      uses: gradle/gradle-build-action@v2
-      with:
-        cache-read-only: false
-        gradle-home-cache-cleanup: true
-      
-    - name: Run tests
-      run: ./gradlew allTests --info --build-cache
-      
-    - name: Publish Test Results
-      uses: mikepenz/action-junit-report@v3
-      if: always()
-      with:
-        report_paths: '**/build/test-results/test/TEST-*.xml'
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Test
+        env:
+          TEST_TASKS: ${{ matrix.tasks }}
+        shell: bash
+        run: |
+          read -r -a tasks <<< "$TEST_TASKS"
+          bash ./gradlew --no-daemon --max-workers=2 \
+            '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' \
+            -PciPackaging=true "${tasks[@]}"
+      - name: Test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports-${{ matrix.os }}
+          path: build/reports/tests/
+          retention-days: 14

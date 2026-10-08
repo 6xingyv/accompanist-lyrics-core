@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "com.mocharealm.accompanist"
-version = "0.5.0"
+version = providers.gradleProperty("releaseVersion").getOrElse("0.5.0")
 
 kotlin {
     jvmToolchain(21)
@@ -24,13 +24,7 @@ kotlin {
                 }
             }
         }
-        nodejs {
-            testTask {
-                useKarma {
-                    useChromeHeadless()
-                }
-            }
-        }
+        nodejs()
     }
 
     @OptIn(ExperimentalWasmDsl::class)
@@ -64,6 +58,10 @@ kotlin {
 publishing {
     repositories {
         maven {
+            name = "ci"
+            url = layout.buildDirectory.dir("ci-maven").get().asFile.toURI()
+        }
+        maven {
             name = "local"
             url = uri("file:///E:/maven")
         }
@@ -72,7 +70,8 @@ publishing {
 
 mavenPublishing {
     publishToMavenCentral(automaticRelease = true)
-    if (!providers.gradleProperty("localUnsigned").map(String::toBoolean).getOrElse(false)) {
+    if (!providers.gradleProperty("localUnsigned").map(String::toBoolean).getOrElse(false) &&
+        !providers.gradleProperty("ciPackaging").map(String::toBoolean).getOrElse(false)) {
         signAllPublications()
     }
 
@@ -105,9 +104,9 @@ mavenPublishing {
             }
         }
         scm {
-            url = "https://github.com/6xingyv/Accompanist-Lyrics"
-            connection = "scm:git:git://github.com/6xingyv/Accompanist-Lyrics.git"
-            developerConnection = "scm:git:ssh://git@github.com/6xingyv/Accompanist-Lyrics.git"
+            url = "https://github.com/6xingyv/accompanist-lyrics-core"
+            connection = "scm:git:git://github.com/6xingyv/accompanist-lyrics-core.git"
+            developerConnection = "scm:git:ssh://git@github.com/6xingyv/accompanist-lyrics-core.git"
         }
     }
 }

@@ -1,0 +1,127 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*', '[0-9]*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 60
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ || "$version" == *-SNAPSHOT ]]; then
+            echo '::error::Use a release tag such as v0.5.0 or v0.6.0-rc.1'
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [[ "$version" == *-* ]]; then
+            echo 'prerelease=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'prerelease=false' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Test and package all publications
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          bash ./gradlew --no-daemon --max-workers=2 \
+            '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' \
+            "-PreleaseVersion=$VERSION" -PciPackaging=true \
+            jvmTest macosArm64Test iosSimulatorArm64Test publishAllPublicationsToCiRepository
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          version = os.environ['VERSION']
+          repository = Path('build/ci-maven/com/mocharealm/accompanist')
+          targets = [('lyrics-core', 'pom'), ('lyrics-core-jvm', 'jar')]
+          targets += [(f'lyrics-core-{target}', 'klib') for target in
+                      ['js', 'wasm-js', 'macosx64', 'macosarm64', 'iosx64', 'iosarm64', 'iossimulatorarm64']]
+          for module, suffix in targets:
+              path = repository / module / version / f'{module}-{version}.{suffix}'
+              if not path.is_file():
+                  raise SystemExit(f'Missing publication: {path}')
+          PY
+          mkdir -p dist
+          (cd build/ci-maven && zip -qr "../../dist/lyrics-core-$VERSION-maven.zip" .)
+          (cd dist && shasum -a 256 -- *.zip > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v7
+        with:
+          name: lyrics-core-${{ steps.version.outputs.version }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-test-reports
+          path: '**/build/reports/tests/'
+          retention-days: 14
+      - name: Publish to Maven Central
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_IN_MEMORY_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.SIGNING_IN_MEMORY_KEY_ID }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_IN_MEMORY_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          if [[ -z "$ORG_GRADLE_PROJECT_mavenCentralUsername" || -z "$ORG_GRADLE_PROJECT_mavenCentralPassword" || -z "$ORG_GRADLE_PROJECT_signingInMemoryKey" ]]; then
+            echo '::error::Maven Central credentials and a signing key are required.'
+            exit 1
+          fi
+          if [[ -z "$ORG_GRADLE_PROJECT_signingInMemoryKeyId" ]]; then
+            unset ORG_GRADLE_PROJECT_signingInMemoryKeyId
+          fi
+          bash ./gradlew --no-daemon --max-workers=2 "-PreleaseVersion=$VERSION" \
+            publishToMavenCentral
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: lyrics-core-${{ needs.build.outputs.version }}
+          path: dist
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          PRERELEASE: ${{ needs.build.outputs.prerelease }}
+        shell: bash
+        run: |
+          if gh release view "$TAG" --json isDraft > release.json; then
+            if [[ "$(jq -r .isDraft release.json)" != true ]]; then
+              echo '::error::This tag already has a published release.'
+              exit 1
+            fi
+          else
+            gh release create "$TAG" --verify-tag --draft --title "$TAG" --generate-notes
+          fi
+          gh release upload "$TAG" dist/* --clobber
+          gh release edit "$TAG" --draft=false --prerelease="$PRERELEASE"
