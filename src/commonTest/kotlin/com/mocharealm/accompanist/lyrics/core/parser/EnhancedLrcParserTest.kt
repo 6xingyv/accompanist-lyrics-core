@@ -52,4 +52,26 @@ class EnhancedLrcParserTest {
         assertEquals(p1.accompanimentLines?.size, p2.accompanimentLines?.size)
         assertEquals(p1.accompanimentLines?.first()?.translation, p2.accompanimentLines?.first()?.translation)
     }
+
+    @Test
+    fun testVoiceAlignmentRoundTrip() {
+        val lrc = """
+            [00:01.00]v1: <00:01.00>Singer <00:01.50>One<00:02.00>
+            [00:03.00]v2: <00:03.00>Singer <00:03.50>Two<00:04.00>
+        """.trimIndent().split("\n")
+
+        val parsed = EnhancedLrcParser.parse(lrc)
+        assertEquals(2, parsed.lines.size)
+        assertEquals(com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeAlignment.Start, (parsed.lines[0] as KaraokeLine).alignment)
+        assertEquals(com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeAlignment.End, (parsed.lines[1] as KaraokeLine).alignment)
+
+        val exported = EnhancedLrcExporter.export(parsed)
+        kotlin.test.assertTrue(exported.contains("v1: <00:01.000>Singer"))
+        kotlin.test.assertTrue(exported.contains("v2: <00:03.000>Singer"))
+
+        val reParsed = EnhancedLrcParser.parse(exported.split("\n"))
+        assertEquals(2, reParsed.lines.size)
+        assertEquals(com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeAlignment.Start, (reParsed.lines[0] as KaraokeLine).alignment)
+        assertEquals(com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeAlignment.End, (reParsed.lines[1] as KaraokeLine).alignment)
+    }
 }

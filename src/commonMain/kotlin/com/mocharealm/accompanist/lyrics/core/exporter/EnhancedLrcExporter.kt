@@ -1,6 +1,7 @@
 package com.mocharealm.accompanist.lyrics.core.exporter
 
 import com.mocharealm.accompanist.lyrics.core.model.SyncedLyrics
+import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeAlignment
 import com.mocharealm.accompanist.lyrics.core.model.karaoke.KaraokeLine
 import com.mocharealm.accompanist.lyrics.core.model.synced.SyncedLine
 import com.mocharealm.accompanist.lyrics.core.utils.toTimeFormattedString
@@ -46,12 +47,17 @@ object EnhancedLrcExporter : ILyricsExporter {
                 }
 
                 is KaraokeLine -> {
+                    val voicePrefix = when (line.alignment) {
+                        KaraokeAlignment.Start -> "v1: "
+                        KaraokeAlignment.End -> "v2: "
+                        else -> ""
+                    }
                     // Export Main Line with syllable timing
                     val syllablesStr = line.syllables.joinToString("") { s ->
                         "<${s.start.toTimeFormattedString()}>${s.content}"
                     } + "<${line.end.toTimeFormattedString()}>"
                     
-                    builder.appendLine("$timeTag$syllablesStr")
+                    builder.appendLine("$timeTag$voicePrefix$syllablesStr")
                     line.translation?.let { builder.appendLine("$timeTag$it") }
                     
                     if (line is KaraokeLine.MainKaraokeLine) {
