@@ -73,7 +73,8 @@ class TTMLParser(
 
         // Parse each line's begin time once (as the sort key) rather than letting
         // sortedBy re-evaluate parseAsTime O(n log n) times.
-        val sortedParagraphs = findAllPElements(root)
+        val body=findBody(root)
+        val sortedParagraphs = (body?.let{findAllPElements(it.first,it.second)}?:findAllPElements(root))
             .map { it to (it.first.attr("begin")?.parseAsTime() ?: Int.MAX_VALUE) }
             .sortedBy { it.second }
             .map { it.first }
@@ -94,16 +95,21 @@ class TTMLParser(
         return applyFallbackPhonetics(syncedLyrics)
     }
 
-    private fun extractAllText(element: XmlElement): String {
-        val sb = StringBuilder()
-        sb.append(element.text)
-        for (child in element.children) {
-            // we don't extract from translation or ruby spans if they are just metadata, but for safe fallback let's just extract all text that isn't translation
-            if (child.name == "span" && (child.hasRole("x-translation") || child.hasRole("x-bg") || child.hasRole("x-roman"))) continue
-            sb.append(extractAllText(child))
+    private fun orderedText(element:XmlElement,excludeAuxiliary:Boolean):String = buildString {
+        if(element.content.isNotEmpty()) {
+            for(child in element.content) {
+                if(excludeAuxiliary && (child.hasRole("x-translation")||child.hasRole("x-bg")||child.hasRole("x-roman")))continue
+                append(orderedText(child,excludeAuxiliary))
+            }
+        }else {
+            append(element.text)
+            for(child in element.children) {
+                if(excludeAuxiliary && (child.hasRole("x-translation")||child.hasRole("x-bg")||child.hasRole("x-roman")))continue
+                append(orderedText(child,excludeAuxiliary))
+            }
         }
-        return sb.toString()
     }
+    private fun extractAllText(element:XmlElement):String=orderedText(element,true)
 
     private fun parseSingleLine(
         p: XmlElement,
@@ -121,7 +127,7 @@ class TTMLParser(
         var syllables = parseSyllablesFromChildren(p.children, languageTag)
 
         // Pronunciation captions inherit the original line/syllable clock.
-        val linePhonetic = p.children.firstOrNull { it.name == "span" && it.hasRole("x-roman") }
+        val linePhonetic = p.children.firstOrNull { it.name.substringAfter(':') == "span" && it.hasRole("x-roman") }
             ?.let(::extractTextContent)?.let(::normalizeXmlTextContent)?.takeIf { it.isNotEmpty() }
         var metadataPhonetic: String? = null
         if (linePhonetic == null) transliterations[itunesKey]?.let { supplied ->
@@ -132,13 +138,13 @@ class TTMLParser(
 
         // 3. 解析主音轨翻译
         val inlineTranslation = p.children.firstOrNull {
-            it.name == "span" && it.hasRole("x-translation") && !it.hasRole("x-bg")
-        }?.text?.trim()
+            it.name.substringAfter(':') == "span" && it.hasRole("x-translation") && !it.hasRole("x-bg")
+        }?.let(::extractAllText)?.let(::normalizeXmlTextContent)
         val itunesTranslation = translations[itunesKey]
 
         // 4. 解析和声轨 (Background Vocals)
         val accompanimentLines = p.children
-            .filter { it.name == "span" && it.hasRole("x-bg") }
+            .filter { it.name.substringAfter(':') == "span" && it.hasRole("x-bg") }
             .mapNotNull { bgSpan ->
                 parseAccompaniment(
                     bgSpan,
@@ -212,15 +218,7 @@ class TTMLParser(
     )
 
     /** Extracts an element's own text plus all descendants, preserving actual lyric content. */
-    private fun extractTextContent(element: XmlElement): String = buildString {
-        append(element.text)
-        element.children.forEach { child ->
-            when (child.name) {
-                "#text" -> append(child.text)
-                else -> append(extractTextContent(child))
-            }
-        }
-    }
+    private fun extractTextContent(element:XmlElement):String=orderedText(element,false)
 
     /**
      * Parses Apple/iTunes translation metadata without flattening nested x-bg spans
@@ -234,16 +232,15 @@ class TTMLParser(
         fun findTranslations(elem: XmlElement) {
             if (elem.name == "translation" || elem.name.endsWith(":translation")) {
                 elem.children.forEach { textElem ->
-                    if (textElem.name != "text") return@forEach
+                    if (textElem.name.substringAfter(':') != "text") return@forEach
 
                     val key = textElem.attr("for") ?: return@forEach
-                    val main = decodeXmlEntities(textElem.text)
-                        .trim()
+                    val main = normalizeXmlTextContent(extractAllText(textElem))
                         .takeIf { it.isNotEmpty() }
 
                     val background = textElem.children
                         .asSequence()
-                        .filter { it.name == "span" && it.hasRole("x-bg") }
+                        .filter { it.name.substringAfter(':') == "span" && it.hasRole("x-bg") }
                         .map(::extractTextContent)
                         .map(::decodeXmlEntities)
                         .map(String::trim)
@@ -364,7 +361,7 @@ class TTMLParser(
             val child = children[i]
 
             // We only care about <span> elements that are not for translation or background roles at this level.
-            if (child.name == "span") {
+            if (child.name.substringAfter(':') == "span") {
                 // Single pass over the (tiny) attribute list: grab begin/end and
                 // detect an excluded role at once instead of scanning it 3×.
                 var spanBegin: String? = null
@@ -415,7 +412,7 @@ class TTMLParser(
 
     /** The single <metadata> node (in the head), or null. Stops at the first match. */
     private fun findMetadata(elem: XmlElement): XmlElement? {
-        if (elem.name == "metadata") return elem
+        if (elem.name.substringAfter(':') == "metadata") return elem
         return elem.children.firstNotNullOfOrNull { findMetadata(it) }
     }
 
@@ -479,13 +476,19 @@ class TTMLParser(
         }
     }
 
+    private fun findBody(element:XmlElement,inheritedLanguageTag:String?=null):Pair<XmlElement,String?>? {
+        val languageTag=element.attr("xml:lang","lang")?:inheritedLanguageTag
+        if(element.name=="body"||element.name.endsWith(":body"))return element to languageTag
+        return element.children.firstNotNullOfOrNull{findBody(it,languageTag)}
+    }
+
     private fun findAllPElements(
         element: XmlElement,
         inheritedLanguageTag: String? = null,
     ): List<Pair<XmlElement, String?>> {
         val pElements = mutableListOf<Pair<XmlElement, String?>>()
         val languageTag = element.attr("xml:lang", "lang") ?: inheritedLanguageTag
-        if (element.name == "p") {
+        if (element.name.substringAfter(':') == "p") {
             pElements.add(element to languageTag)
         }
         element.children.forEach { child ->

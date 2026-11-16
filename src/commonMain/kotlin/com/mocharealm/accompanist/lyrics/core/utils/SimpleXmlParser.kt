@@ -9,7 +9,8 @@ internal data class XmlElement(
     val name: String,
     val attributes: List<XmlAttribute>,
     val children: List<XmlElement>,
-    val text: String
+    val text: String,
+    val content: List<XmlElement> = emptyList(),
 )
 
 internal class SimpleXmlParser {
@@ -27,7 +28,7 @@ internal class SimpleXmlParser {
 
                             if (stack.size > 1) {
                                 val current = stack.removeLast().toXmlElement()
-                                stack.last().children.add(current)
+                                stack.last().addChild(current)
                             }
 
                             i = endIndex + 1
@@ -64,7 +65,7 @@ internal class SimpleXmlParser {
 
                             if (isSelfClosing) {
                                 if (stack.isNotEmpty()) {
-                                    stack.last().children.add(newElement.toXmlElement())
+                                    stack.last().addChild(newElement.toXmlElement())
                                 } else {
                                     return newElement.toXmlElement()
                                 }
@@ -121,7 +122,7 @@ internal class SimpleXmlParser {
             val isLayoutWhitespace = rawText.contains('\n') || rawText.contains('\r')
 
             if (!isLayoutWhitespace || hasSemanticInlineSpace) {
-                element.children.add(
+                element.addChild(
                     XmlElement(
                         name = "#text",
                         attributes = emptyList(),
@@ -137,6 +138,7 @@ internal class SimpleXmlParser {
         }
 
         element.textBuilder.append(rawText)
+        element.content.add(XmlElement("#text",emptyList(),emptyList(),rawText))
     }
 
     private fun parseTagAndAttributes(tagPart: String): Pair<String, List<XmlAttribute>> {
@@ -204,14 +206,17 @@ internal class SimpleXmlParser {
         val name: String,
         val attributes: MutableList<XmlAttribute> = mutableListOf(),
         val children: MutableList<XmlElement> = mutableListOf(),
-        val textBuilder: StringBuilder = StringBuilder()
+        val textBuilder: StringBuilder = StringBuilder(),
+        val content: MutableList<XmlElement> = mutableListOf()
     ) {
+        fun addChild(child:XmlElement){children.add(child);content.add(child)}
         fun toXmlElement(): XmlElement {
             return XmlElement(
                 name = name,
                 attributes = attributes,
                 children = children,
-                text = textBuilder.toString()
+                text = textBuilder.toString(),
+                content = content.toList()
             )
         }
     }
